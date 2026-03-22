@@ -355,6 +355,22 @@ function showMeanBurn(message, opts = {}) {
   const existing = document.getElementById('anarchist-stickman');
   if (existing) existing.remove();
 
+  // Start TTS in parallel
+  let ttsPromise;
+  chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
+    const voiceName        = data.ttsVoice         || 'en_us_006';
+    const stutterIntensity = data.stutterIntensity  ?? 50;
+    ttsPromise = TTSController.speakWithStutter(message, { stutterIntensity, voiceName, onStatus: () => {} })
+      .catch(() => new Promise(resolve => {
+        if (!window.speechSynthesis) { resolve(); return; }
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(message);
+        u.onend = u.onerror = resolve;
+        window.speechSynthesis.speak(u);
+      }));
+    if (phase === 'idle') startWalkout();
+  });
+
   const { CHAR_W, CHAR_H, ROWS } = SpriteAnimator;
   const ANIM_SPEED = 4;
   const wrap = SpriteAnimator.createWalkWrapper(positioned);
@@ -374,31 +390,13 @@ function showMeanBurn(message, opts = {}) {
   let walkTick = 0;
   const SALUTE_HOLD = 80;
   let saluteTick = 0;
-  let ttsStarted = false;
 
-  function startThenWalkout() {
-    if (ttsStarted) return;
-    ttsStarted = true;
-    bubble.style.opacity = '1';
-
-    chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
-      const voiceName        = data.ttsVoice        || 'en_us_006';
-      const stutterIntensity = data.stutterIntensity ?? 50;
-      TTSController.speakWithStutter(message, { stutterIntensity, voiceName, onStatus: () => {} })
-        .catch(() => new Promise(resolve => {
-          if (!window.speechSynthesis) { resolve(); return; }
-          window.speechSynthesis.cancel();
-          const u = new SpeechSynthesisUtterance(message);
-          u.onend = u.onerror = resolve;
-          window.speechSynthesis.speak(u);
-        }))
-        .then(() => {
-          bubble.style.opacity = '0';
-          phase = 'walkout';
-          facing = 'right';
-          walkTick = 0;
-        });
-    });
+  let walkoutScheduled = false;
+  function startWalkout() {
+    if (walkoutScheduled) return;
+    if (!ttsPromise) return;
+    walkoutScheduled = true;
+    ttsPromise.then(() => { phase = 'walkout'; facing = 'right'; bubble.style.opacity = '0'; walkTick = 0; });
   }
 
   function tick() {
@@ -419,7 +417,8 @@ function showMeanBurn(message, opts = {}) {
       saluteTick++;
       if (saluteTick >= SALUTE_HOLD) {
         phase = 'idle'; facing = 'left';
-        startThenWalkout(); // show bubble + speak, walk out only after TTS done
+        bubble.style.opacity = '1';
+        startWalkout();
       }
     } else if (phase === 'walkout') {
       walkTick++;
