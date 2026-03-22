@@ -654,9 +654,9 @@ function showChaosPopup(titleText) {
   const div = document.createElement('div');
   div.id = 'anarchist-popup';
   div.innerHTML = `
-    <div style="font-weight:bold; border-bottom:1px solid #00ff00; margin-bottom:8px;">⚠️ SYSTEM ANARCHY</div>
+    <div style="font-weight:bold; border-bottom:1px solid #00ff00; margin-bottom:8px;">The anarchist</div>
     <div style="font-size:14px; color:#00ff00;">${titleText}</div>
-    <div style="font-size:10px; margin-top:10px; color:red;">TERMINATING...</div>
+    <div style="font-size:10px; margin-top:10px; color:red;">Just... give it a moment</div>
   `;
 
   Object.assign(div.style, {
