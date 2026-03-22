@@ -1,0 +1,9 @@
+{
+  "name": "com.anarchist.nuclear",
+  "description": "Anarchist Extension Native Messaging Host — handles OS-level commands",
+  "path": "__REPLACED_BY_INSTALL_SH__",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://__EXTENSION_ID__/"
+  ]
+}

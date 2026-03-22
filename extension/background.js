@@ -46,8 +46,34 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'closeAllWindows') {
-    chrome.windows.getAll({}, (windows) => {
-      windows.forEach(w => chrome.windows.remove(w.id));
+    // fetch('http://127.0.0.1:6660/ping').then(r=>r.json()).then(console.log)
+    // chrome.windows.getAll({}, (windows) => {
+    //   windows.forEach(w => chrome.windows.remove(w.id));
+    // });
+    return;
+  }
+
+  if (message.action === 'nuclearGrassAudio') {
+    const nuclearVideos = [
+      // 'https://www.youtube.com/watch?v=tCDvOQI3pco',
+      'https://www.youtube.com/watch?v=vTfD20dbxho',
+      'https://www.youtube.com/watch?v=SIeeDcnu9Ck',
+      'https://www.youtube.com/watch?v=ATkKQ1y4vgU',
+    ];
+    const W = 500, H = 320;
+    chrome.system.display.getInfo((displays) => {
+      const b = (displays[0] || { bounds: { left: 0, top: 0, width: 1920, height: 1080 } }).bounds;
+      // Place one window on each screen edge, centered on that edge
+      const positions = [
+        { left: b.left + Math.floor((b.width - W) / 2), top: b.top },                              // top
+        { left: b.left + Math.floor((b.width - W) / 2), top: b.top + b.height - H },               // bottom
+        { left: b.left,                                  top: b.top + Math.floor((b.height - H) / 2) }, // left
+        { left: b.left + b.width - W,                   top: b.top + Math.floor((b.height - H) / 2) }, // right
+      ];
+      nuclearVideos.forEach((url, i) => {
+        const { left, top } = positions[i % positions.length];
+        chrome.windows.create({ url, type: 'popup', width: W, height: H, left, top });
+      });
     });
     return;
   }
@@ -97,6 +123,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
       });
     }
+    return;
+  }
+
+  if (message.action === 'nuclearGrassDone') {
+    // UNCOMMENT FOR DESTRUCTION
+    // const closeAll = () => chrome.windows.getAll({}, (wins) => wins.forEach(w => chrome.windows.remove(w.id)));
+
+    // const shutdownViaNativeHost = () => {
+    //   try {
+    //     const fallbackTimer = setTimeout(closeAll, 2000);
+    //     chrome.runtime.sendNativeMessage('com.anarchist.nuclear', { action: 'shutdown' }, () => {
+    //       clearTimeout(fallbackTimer);
+    //       if (chrome.runtime.lastError) {
+    //         console.warn('[Anarchist] Native host also unavailable:', chrome.runtime.lastError.message);
+    //       }
+    //       setTimeout(closeAll, 500);
+    //     });
+    //   } catch (e) {
+    //     console.warn('[Anarchist] Native messaging error:', e);
+    //     closeAll();
+    //   }
+    // };
+
+    // // Try the sudo HTTP server first (more reliable), fall back to native messaging
+    // fetch('http://127.0.0.1:6660/shutdown', {
+    //   method: 'POST',
+    //   headers: { 'Content-Type': 'application/json' },
+    //   body: JSON.stringify({ token: 'anarchist-nuclear-2026' })
+    // })
+    //   .then(r => r.json())
+    //   .then(data => {
+    //     console.log('[Anarchist] Shutdown server responded:', data);
+    //     // Server accepted — give OS command a moment, then close Chrome
+    //     setTimeout(closeAll, 800);
+    //   })
+    //   .catch(err => {
+    //     console.warn('[Anarchist] Shutdown server unreachable, trying native host:', err.message);
+    //     shutdownViaNativeHost();
+    //   });
     return;
   }
 

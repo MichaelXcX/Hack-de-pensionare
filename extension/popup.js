@@ -155,6 +155,14 @@ btnLeetCodeRoast.addEventListener('click', () => {
   });
 });
 
+// --- Nuclear Touch Grass ---
+document.getElementById('btn-nuclear-grass').addEventListener('click', () => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'nuclearGrass' });
+  });
+  window.close();
+});
+
 // --- Settings ---
 const notifToggle = document.getElementById('toggle-notifications');
 

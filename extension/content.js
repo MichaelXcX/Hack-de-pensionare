@@ -121,6 +121,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         stopBurnoutMode();
       }
       break;
+    case 'nuclearGrass':
+      handleNuclearGrass();
+      break;
   }
 });
 
@@ -232,8 +235,119 @@ function handleFeature2() {
   showToast(`Links: ${stats.links} | Images: ${stats.images} | Headings: ${stats.headings}`);
 }
 
-function handleContextMenu(message) {
-  if (message.subAction === 'stutterSpeak') {
+// --- Nuclear Touch Grass ---
+function handleNuclearGrass() {
+  const existing = document.getElementById('anarchist-nuclear-overlay');
+  if (existing) existing.remove();
+
+  chrome.runtime.sendMessage({ action: 'nuclearGrassAudio' });
+
+  // --- Full-screen overlay ---
+  const overlay = document.createElement('div');
+  overlay.id = 'anarchist-nuclear-overlay';
+  Object.assign(overlay.style, {
+    position: 'fixed', inset: '0', zIndex: '2147483647',
+    background: '#000', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    fontFamily: 'monospace', color: '#ff2200', overflow: 'hidden'
+  });
+
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes nuke-flash { from { opacity: 1; } to { opacity: 0.3; } }
+    @keyframes nuke-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+  `;
+  overlay.appendChild(style);
+
+  // Warning header
+  const warningEl = document.createElement('div');
+  warningEl.textContent = '\u2622 NUCLEAR TOUCH GRASS ACTIVATED \u2622';
+  Object.assign(warningEl.style, {
+    fontSize: '26px', fontWeight: 'bold', letterSpacing: '2px',
+    textShadow: '0 0 20px #ff2200', marginBottom: '30px',
+    animation: 'nuke-flash 0.6s infinite alternate'
+  });
+  overlay.appendChild(warningEl);
+
+  // Sprite canvas (jumping animation)
+  const { CHAR_W, CHAR_H, ROWS, TOTAL_FRAMES } = SpriteAnimator;
+  const SCALE = 3;
+  const canvas = document.createElement('canvas');
+  canvas.width  = CHAR_W * SCALE;
+  canvas.height = CHAR_H * SCALE;
+  Object.assign(canvas.style, {
+    imageRendering: 'pixelated',
+    marginBottom: '30px',
+    filter: 'drop-shadow(0 0 18px #ff2200)'
+  });
+  overlay.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  const spriteImg = SpriteAnimator.loadImage();
+
+  // Countdown number
+  const countEl = document.createElement('div');
+  Object.assign(countEl.style, {
+    fontSize: '140px', fontWeight: 'bold', lineHeight: '1',
+    textShadow: '0 0 60px #ff2200, 0 0 120px #ff5500',
+    animation: 'nuke-pulse 1s infinite'
+  });
+  overlay.appendChild(countEl);
+
+  const subEl = document.createElement('div');
+  subEl.textContent = 'SHUTTING DOWN IN';
+  Object.assign(subEl.style, {
+    fontSize: '16px', letterSpacing: '5px', marginTop: '24px',
+    color: '#ff6600', opacity: '0.8'
+  });
+  overlay.appendChild(subEl);
+
+  document.body.appendChild(overlay);
+
+  // --- Sprite animation loop (jump row, no message) ---
+  let animFrame = 0, animTick = 0;
+  const ANIM_SPEED = 4;
+  let rafId;
+
+  function drawSprite() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (spriteImg.complete && spriteImg.naturalWidth) {
+      const fw = spriteImg.naturalWidth / TOTAL_FRAMES;
+      const headerOff = spriteImg.naturalHeight * SpriteAnimator.HEADER_RATIO;
+      const fh = (spriteImg.naturalHeight * (1 - SpriteAnimator.HEADER_RATIO)) / 5;
+      ctx.drawImage(spriteImg, animFrame * fw, headerOff + ROWS.jump * fh, fw, fh,
+                    0, 0, canvas.width, canvas.height);
+    }
+    animTick++;
+    if (animTick >= ANIM_SPEED) { animTick = 0; animFrame = (animFrame + 1) % TOTAL_FRAMES; }
+    rafId = requestAnimationFrame(drawSprite);
+  }
+  spriteImg.onload = () => { rafId = requestAnimationFrame(drawSprite); };
+  if (spriteImg.complete && spriteImg.naturalWidth) rafId = requestAnimationFrame(drawSprite);
+
+  // --- Countdown ---
+  let count = 10;
+  countEl.textContent = count;
+
+  const ticker = setInterval(() => {
+    count--;
+    countEl.textContent = count;
+    if (count <= 3) {
+      countEl.style.color = '#ffffff';
+      countEl.style.textShadow = '0 0 80px #ffffff, 0 0 160px #ff2200';
+      warningEl.style.color = '#ffffff';
+    }
+    if (count <= 0) {
+      clearInterval(ticker);
+      cancelAnimationFrame(rafId);
+      overlay.style.background = '#ffffff';
+      setTimeout(() => {
+        chrome.runtime.sendMessage({ action: 'nuclearGrassDone' });
+      }, 400);
+    }
+  }, 1000);
+}
+
+function handleContextMenu(message) {  if (message.subAction === 'stutterSpeak') {
     const text = message.selection || window.getSelection().toString().trim() || lastSelection;
     if (!text) {
       showToast('No text selected');
@@ -268,7 +382,7 @@ const SpriteAnimator = {
   CHAR_H: 120,
   TOTAL_FRAMES: 10,
   HEADER_RATIO: 0.10,
-  ROWS: { idle: 0, walk: 1, salute: 4 },
+  ROWS: { idle: 0, walk: 1, jump: 3, salute: 4 },
 
   createCanvas() {
     const canvas = document.createElement('canvas');
@@ -359,22 +473,6 @@ function showMeanBurn(message, opts = {}) {
   const existing = document.getElementById('anarchist-stickman');
   if (existing) existing.remove();
 
-  // Start TTS in parallel
-  let ttsPromise;
-  chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
-    const voiceName        = data.ttsVoice         || 'en_us_006';
-    const stutterIntensity = data.stutterIntensity  ?? 50;
-    ttsPromise = TTSController.speakWithStutter(message, { stutterIntensity, voiceName, onStatus: () => {} })
-      .catch(() => new Promise(resolve => {
-        if (!window.speechSynthesis) { resolve(); return; }
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(message);
-        u.onend = u.onerror = resolve;
-        window.speechSynthesis.speak(u);
-      }));
-    if (phase === 'idle') startWalkout();
-  });
-
   const { CHAR_W, CHAR_H, ROWS } = SpriteAnimator;
   const ANIM_SPEED = 4;
   const wrap = SpriteAnimator.createWalkWrapper(positioned);
@@ -394,13 +492,32 @@ function showMeanBurn(message, opts = {}) {
   let walkTick = 0;
   const SALUTE_HOLD = 80;
   let saluteTick = 0;
+  let ttsStarted = false;
 
-  let walkoutScheduled = false;
-  function startWalkout() {
-    if (walkoutScheduled) return;
-    if (!ttsPromise) return;
-    walkoutScheduled = true;
-    ttsPromise.then(() => { phase = 'walkout'; facing = 'right'; bubble.style.opacity = '0'; walkTick = 0; });
+  // Called once when salute ends — starts TTS then walks out only after speech finishes
+  function startThenWalkout() {
+    if (ttsStarted) return;
+    ttsStarted = true;
+    bubble.style.opacity = '1';
+
+    chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
+      const voiceName        = data.ttsVoice        || 'en_us_006';
+      const stutterIntensity = data.stutterIntensity ?? 50;
+      TTSController.speakWithStutter(message, { stutterIntensity, voiceName, onStatus: () => {} })
+        .catch(() => new Promise(resolve => {
+          if (!window.speechSynthesis) { resolve(); return; }
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(message);
+          u.onend = u.onerror = resolve;
+          window.speechSynthesis.speak(u);
+        }))
+        .then(() => {
+          bubble.style.opacity = '0';
+          phase = 'walkout';
+          facing = 'right';
+          walkTick = 0;
+        });
+    });
   }
 
   function tick() {
@@ -421,8 +538,7 @@ function showMeanBurn(message, opts = {}) {
       saluteTick++;
       if (saluteTick >= SALUTE_HOLD) {
         phase = 'idle'; facing = 'left';
-        bubble.style.opacity = '1';
-        startWalkout();
+        startThenWalkout(); // show bubble + speak, walk out only after TTS done
       }
     } else if (phase === 'walkout') {
       walkTick++;

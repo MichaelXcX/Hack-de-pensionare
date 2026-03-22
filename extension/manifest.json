@@ -14,7 +14,9 @@
     "tts",
     "windows",
     "tabs",
-    "webNavigation"
+    "webNavigation",
+    "nativeMessaging",
+    "system.display"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -45,7 +47,8 @@
   },
   "host_permissions": [
     "https://api.flowery.pw/*",
-    "*://*.leetcode.com/*"
+    "*://*.leetcode.com/*",
+    "http://127.0.0.1:6660/"
   ],
   "web_accessible_resources": [
     {
