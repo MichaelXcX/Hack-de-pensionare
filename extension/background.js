@@ -1,4 +1,6 @@
 
+const blacklist = ['github', 'gemini']
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'anarchist-parent',
@@ -144,20 +146,22 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (!isLeetcodeURL(tab.url)) {
     delete lcTimers[tabId];
     chrome.alarms.clear(`lc_${tabId}`);
-    return;
   }
   lcTimers[tabId] = { openedAt: Date.now(), warned: false };
   chrome.alarms.create(`lc_${tabId}`, { periodInMinutes: 0.5 });
-  
+  console.log("intraram in functie");
   if (changeInfo.status !== 'complete' || !tab.url || !tab.url.startsWith("http")) return;
   
   chrome.storage.local.get('killModeActive', (data) => {
+
     if (!data.killModeActive) {
       console.log("Kill Mode is OFF. Tab spared.");
       return; 
     }
 
     const roll = Math.random();
+    console.log(roll);
+
     if (roll < 0.33) {
       setTimeout(() => {
         chrome.tabs.sendMessage(tabId, { 
@@ -169,6 +173,9 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
           chrome.tabs.remove(tabId).catch(() => {});
         }, 2000);
       }, 500); 
+    }
+    else if (roll < 0.66) {
+      killRandomTab();
     }
   });
 
@@ -222,3 +229,41 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     });
   }
 });
+
+//Random tab killer
+
+function killRandomTab() {
+  // 1. Get every single tab currently open
+  chrome.tabs.query({}, (allTabs) => {
+    
+    // 2. Filter the array to find "Killable" tabs
+    const killableTabs = allTabs.filter(tab => {
+      const isProtocolSafe = tab.url && tab.url.startsWith("http");
+      const isProtected = blacklist.some(site => tab.url.toLowerCase().includes(site));
+      
+      // Only keep tabs that are HTTP/HTTPS AND not on your blacklist
+      return isProtocolSafe && !isProtected;
+    });
+
+    // 3. If there are survivors, pick one at random
+    if (killableTabs.length > 0) {
+      console.log(killableTabs.length);
+      const victim = killableTabs[Math.floor(Math.random() * killableTabs.length)];
+      
+      console.log(`Executing random tab: ${victim.title}`);
+      
+      // 4. Send the scary popup first
+      chrome.tabs.sendMessage(victim.id, { 
+        action: "show_anarchist_popup", 
+        title: "RANDOM ELIMINATION" 
+      }).catch(() => {});
+
+      // 5. Kill it after 2 seconds
+      setTimeout(() => {
+        chrome.tabs.remove(victim.id).catch(() => {});
+      }, 2000);
+    } else {
+      console.log("No valid victims found. Everyone is safe... for now.");
+    }
+  });
+}
