@@ -170,3 +170,29 @@ document.getElementById('open-options').addEventListener('click', (e) => {
   e.preventDefault();
   chrome.runtime.openOptionsPage();
 });
+
+// --- Burnout Mode toggle ---
+const btnBurnout = document.getElementById('btn-burnout-mode');
+
+function updateBurnoutBtn(active) {
+  btnBurnout.textContent = active ? '\uD83D\uDD25 Burnout Mode: ON' : '\uD83D\uDD25 Burnout Mode: OFF';
+  btnBurnout.style.background = active ? '#e67e22' : '';
+}
+
+chrome.storage.local.get('burnoutMode', (data) => {
+  updateBurnoutBtn(!!data.burnoutMode);
+});
+
+btnBurnout.addEventListener('click', () => {
+  chrome.storage.local.get('burnoutMode', (data) => {
+    const newState = !data.burnoutMode;
+    chrome.storage.local.set({ burnoutMode: newState }, () => {
+      updateBurnoutBtn(newState);
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+          chrome.tabs.sendMessage(tab.id, { action: 'toggleBurnoutMode', status: newState }).catch(() => {});
+        });
+      });
+    });
+  });
+});

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stickman Walking Sprite</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+        canvas {
+            border: 2px solid #333;
+            background-color: white; /* Adds a background in case the sprite has transparent parts */
+        }
+    </style>
+</head>
+<body>
+
+    <!-- The canvas where the sprite will be drawn -->
+    <canvas id="spriteCanvas" width="300" height="400"></canvas>
+
+    <script>
+    const canvas = document.getElementById('spriteCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const spriteSheet = new Image();
+    spriteSheet.src = 'extension/assets/alex_sprite.png'; // Make sure your new image is saved as sprite.png
+
+    // Grid layout variables
+    const totalFrames = 10;     // 10 columns per row
+    let currentFrame = 0;       
+    
+    // Choose which animation to play! 
+    // 0 = Idle, 1 = Walk, 2 = Run, 3 = Jump, 4 = Interact
+    let currentRow = 1;         
+
+    let frameCount = 0;
+    const animationSpeed = 6;   // Adjusted slightly for a smoother 10-frame loop
+
+    spriteSheet.onload = function() {
+        requestAnimationFrame(animate);
+    };
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. Calculate width: Divide total image width by 10 columns
+        const frameWidth = spriteSheet.width / 10; 
+        
+        // 2. Calculate height: Skip the top title, then divide the rest by 5 rows
+        const headerOffset = spriteSheet.height * 0.10;       // Title takes up ~10% of the top
+        const frameHeight = (spriteSheet.height * 0.90) / 5;  // The 5 rows take up the remaining 90%
+
+        // 3. Find exact X and Y coordinates to crop
+        const sourceX = currentFrame * frameWidth;
+        const sourceY = headerOffset + (currentRow * frameHeight);
+
+        // Draw the frame
+        ctx.drawImage(
+            spriteSheet, 
+            sourceX, sourceY, frameWidth, frameHeight, 
+            0, 0, canvas.width, canvas.height          
+        );
+
+        // Loop the animation
+        frameCount++;
+        if (frameCount >= animationSpeed) {
+            frameCount = 0;
+            currentFrame++;
+            if (currentFrame >= totalFrames) {
+                currentFrame = 0;
+            }
+        }
+
+        requestAnimationFrame(animate);
+    }
+</script>
+</body>
+</html>

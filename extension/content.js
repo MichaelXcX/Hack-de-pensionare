@@ -110,6 +110,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   showChaosPopup(message.title); // Calls your green/black box function
   sendResponse({ status: "Popup displayed" }); // Clears the 'undefined' log
   break;
+    case 'toggleBurnoutMode':
+      if (message.status) {
+        if (isPdfPage()) startBurnoutMode();
+      } else {
+        stopBurnoutMode();
+      }
+      break;
   }
 });
 
@@ -248,187 +255,177 @@ chrome.storage.local.get('touchGrassEnabled', (data) => {
 });
 
 // --- Toast notification helper ---
+
+// ============================================================
+// --- Shared Sprite Animator for alex_sprite.png ---
+// ============================================================
+const SpriteAnimator = {
+  CHAR_W: 90,
+  CHAR_H: 120,
+  TOTAL_FRAMES: 10,
+  HEADER_RATIO: 0.10,
+  ROWS: { idle: 0, walk: 1, salute: 4 },
+
+  createCanvas() {
+    const canvas = document.createElement('canvas');
+    canvas.width = this.CHAR_W;
+    canvas.height = this.CHAR_H;
+    Object.assign(canvas.style, { display: 'block', imageRendering: 'pixelated' });
+    return canvas;
+  },
+
+  loadImage() {
+    const img = new Image();
+    img.src = chrome.runtime.getURL('assets/alex_sprite.png');
+    return img;
+  },
+
+  draw(ctx, img, row, frame, facing, w, h) {
+    ctx.clearRect(0, 0, w, h);
+    if (!img.complete || !img.naturalWidth) return;
+    const fw = img.naturalWidth / this.TOTAL_FRAMES;
+    const headerOff = img.naturalHeight * this.HEADER_RATIO;
+    const fh = (img.naturalHeight * (1 - this.HEADER_RATIO)) / 5;
+    ctx.save();
+    if (facing === 'left') {
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, frame * fw, headerOff + row * fh, fw, fh, -w, 0, w, h);
+    } else {
+      ctx.drawImage(img, frame * fw, headerOff + row * fh, fw, fh, 0, 0, w, h);
+    }
+    ctx.restore();
+  },
+
+  // Creates a standard walk-in wrapper positioned at bottom-right, off-screen
+  createWalkWrapper(position) {
+    const wrap = document.createElement('div');
+    Object.assign(wrap.style, {
+      position: position || 'fixed',
+      bottom: '70px',
+      right: '0px',
+      zIndex: '2147483647',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      transform: `translateX(${this.CHAR_W + 20}px)`,
+      transition: 'transform 0s'
+    });
+    return wrap;
+  },
+
+  // Creates a speech bubble element
+  createBubble(text) {
+    const bubble = document.createElement('div');
+    Object.assign(bubble.style, {
+      background: '#fff', border: '2px solid #333', borderRadius: '10px',
+      padding: '8px 12px', marginBottom: '6px', maxWidth: '220px',
+      fontSize: '13px', fontFamily: 'system-ui, sans-serif', fontWeight: 'bold',
+      color: '#222', boxShadow: '0 2px 8px rgba(0,0,0,0.25)', opacity: '0',
+      transition: 'opacity 0.4s', textAlign: 'center', position: 'relative'
+    });
+    bubble.textContent = text;
+    const tri = document.createElement('div');
+    Object.assign(tri.style, {
+      position: 'absolute', bottom: '-10px', right: '18px',
+      width: '0', height: '0',
+      borderLeft: '8px solid transparent', borderRight: '8px solid transparent',
+      borderTop: '10px solid #333'
+    });
+    bubble.appendChild(tri);
+    return bubble;
+  },
+
+  // Shared easing helpers
+  easeOut(p) { return 1 - Math.pow(1 - p, 3); },
+  easeIn(p)  { return Math.pow(p, 3); },
+
+  // Standard walk-in/out translateX
+  slideX(wrap, startX, targetX, progress, easing) {
+    const x = startX + (targetX - startX) * easing(progress);
+    wrap.style.transform = `translateX(${x}px)`;
+  }
+};
+
 // --- Mean Mode: stickman walk-in then show burn ---
 function showMeanBurn(message, opts = {}) {
   const container  = opts.container || document.body;
   const onDone     = opts.onDone   || null;
   const positioned = container === document.body ? 'fixed' : 'absolute';
 
-  // Remove any existing stickman
   const existing = document.getElementById('anarchist-stickman');
   if (existing) existing.remove();
 
-  // Start TTS immediately (parallel to animation) — walkout triggers when speech ends
-  let ttsPromise;
-  chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
-    const voiceName        = data.ttsVoice         || 'en_us_006';
-    const stutterIntensity = data.stutterIntensity  ?? 50;
-    ttsPromise = TTSController.speakWithStutter(message, { stutterIntensity, voiceName, onStatus: () => {} })
-      .catch(e => console.warn('[Anarchist] stickman TTS error:', e));
-    // If already waiting for TTS (salute finished before storage resolved), kick off walkout
-    if (phase === 'idle') startWalkout();
-  });
-  const spriteUrl = chrome.runtime.getURL('assets/alex_sprite.png');
-  const CHAR_W = 90;   // rendered width of the stickman
-  const CHAR_H = 120;  // rendered height
-  const WALK_ROW = 1;  // row index for walking
-  const TOTAL_FRAMES = 10;
-  const HEADER_RATIO = 0.10;
-  const ANIM_SPEED = 4; // frames of rAF per sprite frame
-
-  // Container pinned to bottom-right, starts off-screen
-  const wrap = document.createElement('div');
+  const { CHAR_W, CHAR_H, ROWS } = SpriteAnimator;
+  const ANIM_SPEED = 4;
+  const wrap = SpriteAnimator.createWalkWrapper(positioned);
   wrap.id = 'anarchist-stickman';
-  Object.assign(wrap.style, {
-    position: positioned,
-    bottom: '70px',
-    right: '0px',
-    zIndex: '2147483647',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    transform: `translateX(${CHAR_W + 20}px)`,
-    transition: 'transform 0s'
-  });
-
-  // Speech bubble (hidden initially)
-  const bubble = document.createElement('div');
-  Object.assign(bubble.style, {
-    background: '#fff',
-    border: '2px solid #333',
-    borderRadius: '10px',
-    padding: '8px 12px',
-    marginBottom: '6px',
-    maxWidth: '220px',
-    fontSize: '13px',
-    fontFamily: 'system-ui, sans-serif',
-    fontWeight: 'bold',
-    color: '#222',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
-    opacity: '0',
-    transition: 'opacity 0.4s',
-    textAlign: 'center',
-    position: 'relative'
-  });
-  bubble.textContent = message;
-  // little triangle at bottom-right
-  const tri = document.createElement('div');
-  Object.assign(tri.style, {
-    position: 'absolute',
-    bottom: '-10px',
-    right: '18px',
-    width: '0',
-    height: '0',
-    borderLeft: '8px solid transparent',
-    borderRight: '8px solid transparent',
-    borderTop: '10px solid #333'
-  });
-  bubble.appendChild(tri);
-
-  // Canvas for sprite
-  const canvas = document.createElement('canvas');
-  canvas.width = CHAR_W;
-  canvas.height = CHAR_H;
-  Object.assign(canvas.style, { display: 'block', imageRendering: 'pixelated' });
+  const bubble = SpriteAnimator.createBubble(message);
+  const canvas = SpriteAnimator.createCanvas();
+  const img = SpriteAnimator.loadImage();
+  const ctx = canvas.getContext('2d');
 
   wrap.appendChild(bubble);
   wrap.appendChild(canvas);
   container.appendChild(wrap);
 
-  const ctx = canvas.getContext('2d');
-  const img = new Image();
-  img.src = spriteUrl;
-
-  let frameCount = 0;
-  let currentFrame = 0;
-  let phase = 'walkin'; // 'walkin' | 'idle' | 'walkout'
-  let facing = 'left'; // faces left when walking in, right when walking out
-  let rafId;
-
-  // Walk-in: slide from right edge to resting position (16px from right)
-  const TARGET_X = 0; // translateX target (0 = resting at right edge)
-  const START_X = CHAR_W + 20;
-  const WALK_DURATION = 80; // rAF ticks for walk-in
+  let frameCount = 0, currentFrame = 0;
+  let phase = 'walkin', facing = 'left', rafId;
+  const START_X = CHAR_W + 20, TARGET_X = 0, WALK_DURATION = 80;
   let walkTick = 0;
+  const SALUTE_HOLD = 80;
+  let saluteTick = 0;
+  let ttsStarted = false;
 
-  function drawFrame(row, frame) {
-    ctx.clearRect(0, 0, CHAR_W, CHAR_H);
-    if (!img.complete || !img.naturalWidth) return;
-    const fw = img.naturalWidth / TOTAL_FRAMES;
-    const headerOff = img.naturalHeight * HEADER_RATIO;
-    const fh = (img.naturalHeight * (1 - HEADER_RATIO)) / 5;
-    ctx.save();
-    if (facing === 'left') {
-      ctx.scale(-1, 1);
-      ctx.drawImage(img, frame * fw, headerOff + row * fh, fw, fh, -CHAR_W, 0, CHAR_W, CHAR_H);
-    } else {
-      ctx.drawImage(img, frame * fw, headerOff + row * fh, fw, fh, 0, 0, CHAR_W, CHAR_H);
-    }
-    ctx.restore();
-  }
-  let walkoutScheduled = false;
-  function startWalkout() {
-    if (walkoutScheduled) return;
-    if (!ttsPromise) return; // storage not resolved yet — will be called again after
-    walkoutScheduled = true;
-    ttsPromise.then(() => {
-      phase = 'walkout';
-      facing = 'right';
-      bubble.style.opacity = '0';
-      walkTick = 0;
+  function startThenWalkout() {
+    if (ttsStarted) return;
+    ttsStarted = true;
+    bubble.style.opacity = '1';
+
+    chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
+      const voiceName        = data.ttsVoice        || 'en_us_006';
+      const stutterIntensity = data.stutterIntensity ?? 50;
+      TTSController.speakWithStutter(message, { stutterIntensity, voiceName, onStatus: () => {} })
+        .catch(() => new Promise(resolve => {
+          if (!window.speechSynthesis) { resolve(); return; }
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(message);
+          u.onend = u.onerror = resolve;
+          window.speechSynthesis.speak(u);
+        }))
+        .then(() => {
+          bubble.style.opacity = '0';
+          phase = 'walkout';
+          facing = 'right';
+          walkTick = 0;
+        });
     });
   }
 
-  const SALUTE_ROW = 4;  // row 4 = salute
-  const SALUTE_HOLD = 80; // rAF ticks to hold the salute (~1.3s)
-  let saluteTick = 0;
-
   function tick() {
     if (phase === 'salute' || phase === 'idle') {
-      // Static poses — no frame cycling
-      const row = phase === 'salute' ? SALUTE_ROW : IDLE_ROW;
-      drawFrame(row, 0);
+      SpriteAnimator.draw(ctx, img, phase === 'salute' ? ROWS.salute : ROWS.idle, 0, facing, CHAR_W, CHAR_H);
     } else {
-      // Advance sprite frame for walking
       frameCount++;
-      if (frameCount >= ANIM_SPEED) {
-        frameCount = 0;
-        currentFrame = (currentFrame + 1) % TOTAL_FRAMES;
-      }
-      drawFrame(WALK_ROW, currentFrame);
+      if (frameCount >= ANIM_SPEED) { frameCount = 0; currentFrame = (currentFrame + 1) % SpriteAnimator.TOTAL_FRAMES; }
+      SpriteAnimator.draw(ctx, img, ROWS.walk, currentFrame, facing, CHAR_W, CHAR_H);
     }
 
     if (phase === 'walkin') {
       walkTick++;
-      const progress = Math.min(walkTick / WALK_DURATION, 1);
-      const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-      const x = START_X + (TARGET_X - START_X) * ease;
-      wrap.style.transform = `translateX(${x}px)`;
-      if (progress >= 1) {
-        phase = 'salute';
-        saluteTick = 0;
-      }
+      const p = Math.min(walkTick / WALK_DURATION, 1);
+      SpriteAnimator.slideX(wrap, START_X, TARGET_X, p, SpriteAnimator.easeOut);
+      if (p >= 1) { phase = 'salute'; saluteTick = 0; }
     } else if (phase === 'salute') {
       saluteTick++;
       if (saluteTick >= SALUTE_HOLD) {
-        phase = 'idle';
-        facing = 'left';
-        // Show speech bubble after salute, then walk out when TTS is done
-        bubble.style.opacity = '1';
-        startWalkout();
+        phase = 'idle'; facing = 'left';
+        startThenWalkout(); // show bubble + speak, walk out only after TTS done
       }
     } else if (phase === 'walkout') {
       walkTick++;
-      const progress = Math.min(walkTick / WALK_DURATION, 1);
-      const ease = Math.pow(progress, 3); // ease-in cubic
-      const x = TARGET_X + (START_X - TARGET_X) * ease;
-      wrap.style.transform = `translateX(${x}px)`;
-      if (progress >= 1) {
-        cancelAnimationFrame(rafId);
-        wrap.remove();
-        onDone?.();
-        return;
-      }
+      const p = Math.min(walkTick / WALK_DURATION, 1);
+      SpriteAnimator.slideX(wrap, TARGET_X, START_X, p, SpriteAnimator.easeIn);
+      if (p >= 1) { cancelAnimationFrame(rafId); wrap.remove(); onDone?.(); return; }
     }
     rafId = requestAnimationFrame(tick);
   }
@@ -498,24 +495,19 @@ function startObserving() {
   }
 
   // 2. Watch for "Stupid" interactions
-  document.addEventListener('click', (e) => {
-  // 1. Find the button or the closest thing to a button (handles <span> inside <button>)
+  function handleStupidClick(e) {
   const btn = e.target.closest('button') || e.target.closest('a');
-  
   if (btn) {
     const btnText = btn.innerText.toLowerCase().trim();
-    
-    // 2. Define your "Financial Regret" keywords
     const buyKeywords = ['cart', 'buy', 'checkout', 'purchase', 'order', 'pay', 'cos', 'cumparaturi'];
-
-    // 3. Check if the button text contains any of those words
     const isBuying = buyKeywords.some(keyword => btnText.includes(keyword));
-
     if (isBuying) {
       showMeanBurn(getBurn('shopping'));
     }
   }
-});
+  }
+  document.addEventListener('click', handleStupidClick);
+  window.__anarchistClickHandler = handleStupidClick;
   
   // 3. Mutation Observer to watch for AI/Search queries
   const observer = new MutationObserver(() => {
@@ -543,8 +535,11 @@ function startObserving() {
 }
 
 function stopObserving() {
-  document.removeEventListener('click', handleStupidClick);
-  location.reload(); // Simplest way to kill the MutationObserver
+  if (window.__anarchistClickHandler) {
+    document.removeEventListener('click', window.__anarchistClickHandler);
+    window.__anarchistClickHandler = null;
+  }
+  location.reload();
 }
 
 // --- LeetCode Stickman Roasts ---
@@ -552,7 +547,7 @@ function stopObserving() {
 const ROASTS = {
   'Wrong Answer': [
     "wrong answer?? shocking. truly.",
-    "bro really said 'i know algorithms' 💀",
+    "bro really said \'I know algorithms \' 💀",
     "your solution is wrong. just like your life choices.",
     "even a for loop would've done better.",
     "wrong answer. go touch grass.",
@@ -776,4 +771,213 @@ function showChaosPopup(titleText) {
   });
 
   document.body.appendChild(div);
+}
+
+// ============================================================
+// --- Burnout Mode: arson stickman on PDF scroll ---
+// ============================================================
+
+let _burnoutScrollHandler = null;
+let _burnoutLastFire = 0;
+const BURNOUT_COOLDOWN = 20000; // ms between fires
+
+function isPdfPage() {
+  if (location.href.toLowerCase().includes('.pdf')) return true;
+  if (document.querySelector('embed[type="application/pdf"]')) return true;
+  if (document.querySelector('iframe[src*=".pdf"]')) return true;
+  if (document.querySelector('#plugin')) return true;
+  if (document.contentType === 'application/pdf') return true;
+  // Chrome built-in PDF viewer URL
+  if (location.href.startsWith('chrome-extension://') && location.href.includes('pdf')) return true;
+  return false;
+}
+
+function startBurnoutMode() {
+  if (_burnoutScrollHandler) return; // already running
+
+  let _scrollThrottle = null;
+  let scrollCount = 0;
+
+  _burnoutScrollHandler = () => {
+    const now = Date.now();
+    if (now - _burnoutLastFire < BURNOUT_COOLDOWN) return;
+    scrollCount++;
+    if (scrollCount < 4) return;
+    scrollCount = 0;
+    _burnoutLastFire = now;
+    chrome.runtime.sendMessage({ action: 'startBurnoutAudio' });
+    triggerBurnout();
+  };
+
+  const throttled = () => {
+    if (_scrollThrottle) return;
+    _scrollThrottle = setTimeout(() => {
+      _scrollThrottle = null;
+      _burnoutScrollHandler && _burnoutScrollHandler();
+    }, 500);
+  };
+
+  window.addEventListener('scroll', throttled, { passive: true });
+  window.addEventListener('wheel', throttled, { passive: true, capture: true });
+  document.addEventListener('scroll', throttled, { passive: true, capture: true });
+  _burnoutScrollHandler._throttled = throttled;
+  console.log('[Anarchist] Burnout Mode ON');
+}
+
+function stopBurnoutMode() {
+  if (_burnoutScrollHandler && _burnoutScrollHandler._throttled) {
+    window.removeEventListener('scroll', _burnoutScrollHandler._throttled);
+    window.removeEventListener('wheel', _burnoutScrollHandler._throttled, { capture: true });
+    document.removeEventListener('scroll', _burnoutScrollHandler._throttled, { capture: true });
+  }
+  _burnoutScrollHandler = null;
+  chrome.runtime.sendMessage({ action: 'stopBurnoutAudio' });
+  const burnoutEl = document.getElementById('anarchist-burnout-host');
+  if (burnoutEl) burnoutEl.remove();
+  console.log('[Anarchist] Burnout Mode OFF');
+}
+
+// Auto-start if already enabled when page loads (only on PDF pages)
+chrome.storage.local.get('burnoutMode', (data) => {
+  if (data.burnoutMode && isPdfPage()) startBurnoutMode();
+});
+
+function triggerBurnout() {
+  if (document.getElementById('anarchist-burnout-host')) return;
+
+  const lighterUrl = chrome.runtime.getURL('assets/lighter.png');
+  const fireUrl    = chrome.runtime.getURL('assets/fire.png');
+
+  const { CHAR_W, CHAR_H, ROWS } = SpriteAnimator;
+  const ANIM_SPEED = 4;
+  const FIRE_FRAME_SIZE = 341;
+  const FIRE_GRID = 4;
+  const FIRE_FRAMES = FIRE_GRID * FIRE_GRID;
+  const FIRE_ANIM_SPEED = 3;
+
+  // Shadow DOM host — isolates our elements from the page's CSS/CSP
+  const host = document.createElement('div');
+  host.id = 'anarchist-burnout-host';
+  Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '2147483647', pointerEvents: 'none' });
+  document.body.appendChild(host);
+  const shadow = host.attachShadow({ mode: 'closed' });
+
+  // Inner container inside shadow root
+  const root = document.createElement('div');
+  Object.assign(root.style, { position: 'relative', width: '100%', height: '100%' });
+  shadow.appendChild(root);
+
+  // Stickman
+  const stickyWrap = SpriteAnimator.createWalkWrapper('fixed');
+  const stickCanvas = SpriteAnimator.createCanvas();
+  const stickImg = SpriteAnimator.loadImage();
+  const stickCtx = stickCanvas.getContext('2d');
+  stickyWrap.appendChild(stickCanvas);
+  root.appendChild(stickyWrap);
+
+  let stickFacing = 'left', stickFrame = 0, stickFrameTick = 0;
+
+  // Lighter
+  const lighterEl = document.createElement('img');
+  lighterEl.src = lighterUrl;
+  Object.assign(lighterEl.style, {
+    position: 'fixed', width: '48px', height: '48px', objectFit: 'contain',
+    display: 'none', zIndex: '2147483647', pointerEvents: 'none',
+    transformOrigin: 'center center'
+  });
+  root.appendChild(lighterEl);
+
+  // Fire tiles — tiled across the full bottom of the screen
+  const tileCount = Math.ceil(window.innerWidth / FIRE_FRAME_SIZE) + 1;
+  const fireTiles = [];
+  for (let i = 0; i < tileCount; i++) {
+    const tile = document.createElement('div');
+    Object.assign(tile.style, {
+      position: 'fixed', bottom: '0px', left: (i * FIRE_FRAME_SIZE) + 'px',
+      width: FIRE_FRAME_SIZE + 'px', height: FIRE_FRAME_SIZE + 'px',
+      backgroundImage: `url(${fireUrl})`,
+      backgroundSize: `${FIRE_FRAME_SIZE * FIRE_GRID}px ${FIRE_FRAME_SIZE * FIRE_GRID}px`,
+      backgroundRepeat: 'no-repeat', imageRendering: 'pixelated',
+      display: 'none'
+    });
+    root.appendChild(tile);
+    fireTiles.push(tile);
+  }
+  let fireFrame = 0, fireFrameTick = 0;
+
+  function drawFire() {
+    const col = fireFrame % FIRE_GRID;
+    const row = Math.floor(fireFrame / FIRE_GRID) % FIRE_GRID;
+    const pos = `-${col * FIRE_FRAME_SIZE}px -${row * FIRE_FRAME_SIZE}px`;
+    fireTiles.forEach(t => { t.style.backgroundPosition = pos; });
+  }
+
+  // State machine
+  let phase = 'walkin';
+  const START_X = CHAR_W + 20, TARGET_X = 0, WALK_TICKS = 80;
+  let walkTick = 0, rafId;
+  let throwTick = 0;
+  const THROW_TICKS = 55;
+  const throwStartX = window.innerWidth - CHAR_W - 10;
+  const throwStartY = window.innerHeight - CHAR_H - 20;
+  const throwEndX   = window.innerWidth - FIRE_FRAME_SIZE - 10;
+  const throwEndY   = window.innerHeight - 30;
+  let fireTick = 0;
+  const FIRE_DURATION = 180;
+
+  function tick() {
+    // Draw stickman
+    if (phase === 'walkin' || phase === 'walkout') {
+      stickFrameTick++;
+      if (stickFrameTick >= ANIM_SPEED) { stickFrameTick = 0; stickFrame = (stickFrame + 1) % SpriteAnimator.TOTAL_FRAMES; }
+      SpriteAnimator.draw(stickCtx, stickImg, ROWS.walk, stickFrame, stickFacing, CHAR_W, CHAR_H);
+    } else if (phase === 'throw') {
+      SpriteAnimator.draw(stickCtx, stickImg, ROWS.salute, 0, stickFacing, CHAR_W, CHAR_H);
+    } else {
+      SpriteAnimator.draw(stickCtx, stickImg, ROWS.idle, 0, stickFacing, CHAR_W, CHAR_H);
+    }
+
+    // Draw fire
+    if (phase === 'fire' || phase === 'walkout') {
+      fireFrameTick++;
+      if (fireFrameTick >= FIRE_ANIM_SPEED) { fireFrameTick = 0; fireFrame = (fireFrame + 1) % FIRE_FRAMES; }
+      drawFire();
+    }
+
+    if (phase === 'walkin') {
+      walkTick++;
+      const p = Math.min(walkTick / WALK_TICKS, 1);
+      SpriteAnimator.slideX(stickyWrap, START_X, TARGET_X, p, SpriteAnimator.easeOut);
+      if (p >= 1) { phase = 'throw'; throwTick = 0; }
+    } else if (phase === 'throw') {
+      if (throwTick === 0) lighterEl.style.display = 'block';
+      throwTick++;
+      const p = Math.min(throwTick / THROW_TICKS, 1);
+      const lx = throwStartX + (throwEndX - throwStartX) * p;
+      const ly = throwStartY + (throwEndY - throwStartY) * p - Math.sin(p * Math.PI) * 120;
+      lighterEl.style.left = lx + 'px';
+      lighterEl.style.top  = ly + 'px';
+      lighterEl.style.transform = `rotate(${p * 360}deg)`;
+      if (p >= 1) { lighterEl.style.display = 'none'; fireTiles.forEach(t => t.style.display = 'block'); drawFire(); phase = 'fire'; fireTick = 0; }
+    } else if (phase === 'fire') {
+      fireTick++;
+      if (fireTick >= FIRE_DURATION) { phase = 'walkout'; stickFacing = 'right'; walkTick = 0; }
+    } else if (phase === 'walkout') {
+      walkTick++;
+      const p = Math.min(walkTick / WALK_TICKS, 1);
+      SpriteAnimator.slideX(stickyWrap, TARGET_X, START_X, p, SpriteAnimator.easeIn);
+      if (p >= 1) { cancelAnimationFrame(rafId); host.remove(); return; }
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  const imgsDone = new Set();
+  function onImageDone(key) {
+    if (imgsDone.has(key)) return;
+    imgsDone.add(key);
+    rafId = requestAnimationFrame(tick);
+  }
+  stickImg.onload  = () => onImageDone('stick');
+  stickImg.onerror = () => onImageDone('stick');
+  if (stickImg.complete) onImageDone('stick');
 }

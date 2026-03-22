@@ -1,4 +1,4 @@
-// --- Context menu ---
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: 'anarchist-parent',
@@ -47,6 +47,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     chrome.windows.getAll({}, (windows) => {
       windows.forEach(w => chrome.windows.remove(w.id));
     });
+    return;
+  }
+
+  if (message.action === 'startBurnoutAudio') {
+    (async () => {
+      try {
+        if (await chrome.offscreen.hasDocument()) return;
+        await chrome.offscreen.createDocument({
+          url: chrome.runtime.getURL('offscreen.html'),
+          reasons: ['AUDIO_PLAYBACK'],
+          justification: 'Burnout mode background music'
+        });
+      } catch (e) {
+        console.warn('[Anarchist] Offscreen audio error:', e);
+      }
+    })();
+    return;
+  }
+
+  if (message.action === 'stopBurnoutAudio') {
+    chrome.offscreen.closeDocument().catch(() => {});
     return;
   }
 
@@ -127,6 +148,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (!isLeetcodeURL(tab.url)) {
     delete lcTimers[tabId];
     chrome.alarms.clear(`lc_${tabId}`);
+    return;
   }
   lcTimers[tabId] = { openedAt: Date.now(), warned: false };
   chrome.alarms.create(`lc_${tabId}`, { periodInMinutes: 0.5 });
@@ -170,6 +192,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   const elapsed = Date.now() - timer.openedAt;
 
   if (elapsed >= CLOSE_AFTER_MS) {
+    chrome.storage.local.get('killModeActive', (data) => {
+      if (!data.killModeActive) {
+        console.log('[Anarchist] Kill Mode is OFF. LeetCode tab spared.');
+        return;
+      }
     const msg = randomPhrase(LC_CLOSING_MESSAGES);
     chrome.scripting.executeScript({
       target: { tabId },
@@ -177,13 +204,14 @@ chrome.alarms.onAlarm.addListener((alarm) => {
         if (window.__lcStickmanSpeak) await window.__lcStickmanSpeak(msg, 'roast');
       },
       args: [msg],
-    }).then (() => {;
+    }).then(() => {
       chrome.tabs.remove(tabId).catch(() => {});
       delete lcTimers[tabId];
     }).catch(() => {
       chrome.tabs.remove(tabId).catch(() => {});
       delete lcTimers[tabId];
     });
+    }); // end killModeActive check
 
   } else if (elapsed >= WARN_AFTER_MS && !timer.warned) {
     timer.warned = true;
