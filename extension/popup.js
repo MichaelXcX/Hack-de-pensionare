@@ -139,7 +139,7 @@ btnKillMode.addEventListener('click', () => {
 const btnLeetCodeRoast = document.getElementById('btn-leetcode-roast');
 function updateLcRoastBtn(active) {
   btnLeetCodeRoast.textContent = active ? '🔥 LeetCode Roast: ON' : '🔥 LeetCode Roast: OFF';
-  btnLeetCodeRoast.style.background = active ? '#e94560' : '';
+  btnLeetCodeRoast.style.background = active ? '#7c3ccf' : '';
 }
 
 chrome.storage.local.get('lcRoastEnabled', (data) => {
