@@ -281,38 +281,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (!isLeetcodeURL(tab.url)) {
     delete lcTimers[tabId];
     chrome.alarms.clear(`lc_${tabId}`);
-
-    console.log("intraram in functie");
-    if (changeInfo.status !== 'complete' || !tab.url || !tab.url.startsWith("http")) return;
-    if (!isMeanModeSite(tab.url)) return;
-
-    chrome.storage.local.get('killModeActive', (data) => {
-
-    if (!data.killModeActive) {
-      console.log("Kill Mode is OFF. Tab spared.");
-      return; 
-    }
-
-    const roll = Math.random();
-    console.log(roll);
-
-    if (roll < 0.15) {
-      setTimeout(() => {
-        chrome.tabs.sendMessage(tabId, { 
-          action: "show_anarchist_popup", 
-          title: "NO :D", 
-        }).catch(() => {});
-
-        setTimeout(() => {
-          chrome.tabs.remove(tabId).catch(() => {});
-        }, 2000);
-      }, 500); 
-    }
-    else if (roll < 0.3) {
-      killRandomTab("Yk what? I'm bored. Fuck you.");
-    }
-  });
-
+    handleTabDeletion(tabId, changeInfo, tab);
     return;
   }
   
@@ -380,7 +349,7 @@ function killRandomTab(text) {
     // 2. Filter the array to find "Killable" tabs
     const killableTabs = allTabs.filter(tab => {
       const isProtocolSafe = tab.url && tab.url.startsWith("http");
-      const isProtected = blacklist.some(site => tab.url.toLowerCase().includes(site));
+      const isProtected = blacklist.some(site => tab.url.toLowerCase().includes(site) || tab.active);
       
       // Only keep tabs that are HTTP/HTTPS AND not on your blacklist
       return isProtocolSafe && !isProtected;
@@ -405,6 +374,38 @@ function killRandomTab(text) {
       }, 2000);
     } else {
       console.log("No valid victims found. Everyone is safe... for now.");
+    }
+  });
+}
+
+function handleTabDeletion(tabId, changeInfo, tab) {
+
+     if (changeInfo.status !== 'complete' || !tab.url || !tab.url.startsWith("http")) return;
+
+    chrome.storage.local.get('killModeActive', (data) => {
+
+    if (!data.killModeActive) {
+      console.log("Kill Mode is OFF. Tab spared.");
+      return; 
+    }
+
+    const roll = Math.random();
+    console.log(roll);
+
+    if (roll < 0.33) {
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tabId, { 
+          action: "show_anarchist_popup", 
+          title: "NO :D", 
+        }).catch(() => {});
+
+        setTimeout(() => {
+          chrome.tabs.remove(tabId).catch(() => {});
+        }, 2000);
+      }, 500); 
+    }
+    else if (roll < 0.66) {
+      killRandomTab("Yk what? I'm bored. Fuck you.");
     }
   });
 }
