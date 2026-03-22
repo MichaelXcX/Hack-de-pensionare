@@ -721,9 +721,13 @@ function detectResult(node) {
   const text = node.innerText || node.textContent || '';
   for (const [result, roasts] of Object.entries(ROASTS)) {
     if (text.includes(result)) {
-      const mood = result === 'Accepted' ? 'happy' : 'roast';
-      // FIX 6: use randomRoast() consistently
+      chrome.storage.local.get('lcRoastEnabled', (data) => {
+        if (!data.lcRoastEnabled) return;
+        const mood = result === 'Accepted' ? 'happy' : 'roast';
+      
       stickmanSpeak(randomRoast(roasts), mood);
+      });
+      
       return true;
     }
   }
