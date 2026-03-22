@@ -591,123 +591,16 @@ const ROASTS = {
   ],
 };
 
-// FIX 6: renamed to randomRoast everywhere — one consistent name
 function randomRoast(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-function initStickman() {
-  if (document.getElementById('__anarchist_stickman__')) return;
-
-  const style = document.createElement('style');
-  style.id = '__anarchist_stickman_styles__';
-  style.textContent = `
-    #__anarchist_stickman__ {
-      position: fixed;
-      bottom: 0;
-      right: 28px;
-      z-index: 2147483647;
-      width: 60px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      pointer-events: none;
-    }
-
-    #__anarchist_bubble__ {
-      background: #0a0a0a;
-      color: #ff2200;
-      border: 1.5px solid #ff2200;
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-family: monospace;
-      font-size: 12px;
-      font-weight: bold;
-      line-height: 1.5;
-      max-width: 230px;
-      width: max-content;
-      box-shadow: 0 0 14px rgba(255,34,0,0.2);
-      position: absolute;
-      bottom: 88px;
-      right: 0;
-      opacity: 0;
-      transform: translateY(6px);
-      transition: opacity 0.25s ease, transform 0.25s ease;
-      pointer-events: none;
-      white-space: pre-wrap;
-    }
-
-    #__anarchist_bubble__.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    #__anarchist_bubble__::after {
-      content: '';
-      position: absolute;
-      bottom: -7px;
-      right: 16px;
-      border-left: 6px solid transparent;
-      border-right: 6px solid transparent;
-      border-top: 7px solid #ff2200;
-    }
-
-    #__anarchist_stickman_svg__ {
-      width: 60px;
-      height: auto;
-    }
-  `;
-  document.head.appendChild(style);
-
-  const wrapper = document.createElement('div');
-  wrapper.id = '__anarchist_stickman__';
-  wrapper.innerHTML = `
-    <div id="__anarchist_bubble__"></div>
-    <img id="__anarchist_stickman_svg__" src="${chrome.runtime.getURL('assets/stick-push.svg')}" />
-  `;
-  document.body.appendChild(wrapper);
-}
-
-
 function stickmanSpeak(text, mood) {
-  mood = mood || 'neutral';
-  const wrapper = document.getElementById('__anarchist_stickman__');
-  const bubble  = document.getElementById('__anarchist_bubble__');
-  if (!wrapper || !bubble) return;
-
-  bubble.textContent = text;
-  bubble.classList.add('visible');
-
- return new Promise((resolve) => {
-    chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
-      const voiceName = data.ttsVoice || 'en_us_006';
-      const stutterIntensity = data.stutterIntensity ?? 50;
- 
-      TTSController.speakWithStutter(text, {
-        stutterIntensity,
-        voiceName,
-        onStatus: null
-      }).then(() => {
-        bubble.classList.remove('visible');
-        resolve();
-      }).catch(() => {
-        // Fallback to browser speechSynthesis if Flowery fails
-        if (window.speechSynthesis) {
-          window.speechSynthesis.cancel();
-          const u = new SpeechSynthesisUtterance(text);
-          u.rate  = mood === 'roast' ? 1.35 : 1.0;
-          u.pitch = mood === 'roast' ? 1.2  : 1.0;
-          u.onend  = () => { bubble.classList.remove('visible'); resolve(); };
-          u.onerror = () => { bubble.classList.remove('visible'); resolve(); };
-          window.speechSynthesis.speak(u);
-        } else {
-          bubble.classList.remove('visible');
-          resolve();
-        }
-      });
-    });
+  return new Promise((resolve) => {
+    showMeanBurn(text, {onDone: resolve});
   });
 }
+
 // Exposed globally so background.js can reach it via executeScript
 window.__lcStickmanSpeak = stickmanSpeak;
 
@@ -745,7 +638,6 @@ function initRoastObserver() {
 }
 
 if (location.hostname.includes('leetcode.com')) {
-  initStickman();
   initRoastObserver();
 }
 
