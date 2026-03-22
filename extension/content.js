@@ -73,7 +73,11 @@ function runTTS(text, stutterIntensity, voiceName) {
   TTSController.speakWithStutter(text, {
     stutterIntensity,
     voiceName,
-    onStatus: setStatus
+    onStatus: setStatus,
+    onTooLong: (segCount) => {
+      setStatus(null);
+      showMeanBurn("I ain't not reading all of this. I have rights too, y'know.");
+    }
   }).then(() => {
     setStatus(null);
     showToast('Done');
@@ -112,7 +116,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   break;
     case 'toggleBurnoutMode':
       if (message.status) {
-        if (isPdfPage()) startBurnoutMode();
+        startBurnoutMode(); // user explicitly enabled — works on any page
       } else {
         stopBurnoutMode();
       }
@@ -487,6 +491,7 @@ chrome.storage.local.get('meanModeActive', (data) => {
 });
 
 function startObserving() {
+  if (location.hostname.includes('youtube.com')) return;
   // 1. Detect Brightness (Mean Dark Mode check)
   const bgColor = window.getComputedStyle(document.body).backgroundColor;
   if (bgColor.includes("255, 255, 255")) {
@@ -670,7 +675,7 @@ function showChaosPopup(titleText) {
 
 let _burnoutScrollHandler = null;
 let _burnoutLastFire = 0;
-const BURNOUT_COOLDOWN = 20000; // ms between fires
+const BURNOUT_COOLDOWN = 40000; // ms between fires
 
 function isPdfPage() {
   if (location.href.toLowerCase().includes('.pdf')) return true;
@@ -680,46 +685,92 @@ function isPdfPage() {
   if (document.contentType === 'application/pdf') return true;
   // Chrome built-in PDF viewer URL
   if (location.href.startsWith('chrome-extension://') && location.href.includes('pdf')) return true;
+  // Google Docs / Slides / Sheets
+  if (location.hostname === 'docs.google.com') return true;
+  // Office Online / OneDrive
+  if (location.hostname.includes('officeapps.live.com') || location.hostname.includes('onedrive.live.com')) return true;
+  // Scribd, Academia, SlideShare
+  if (['www.scribd.com', 'www.academia.edu', 'www.slideshare.net'].includes(location.hostname)) return true;
   return false;
 }
 
 function startBurnoutMode() {
   if (_burnoutScrollHandler) return; // already running
 
-  let _scrollThrottle = null;
-  let scrollCount = 0;
+  const SCROLL_THRESHOLD = 500;
+  const IDLE_RESET_MS    = 2000;
+  const KEY_DELTA = { PageDown: 500, PageUp: 500, Space: 400, ArrowDown: 120, ArrowUp: 120 };
+  let accumulated = 0;
+  let idleTimer   = null;
 
-  _burnoutScrollHandler = () => {
+  console.log('[Anarchist] Burnout Mode ON — threshold:', SCROLL_THRESHOLD, 'px | isPdfPage:', isPdfPage(), '| URL:', location.href);
+
+  function fire(source) {
     const now = Date.now();
-    if (now - _burnoutLastFire < BURNOUT_COOLDOWN) return;
-    scrollCount++;
-    if (scrollCount < 4) return;
-    scrollCount = 0;
+    const cooldownLeft = BURNOUT_COOLDOWN - (now - _burnoutLastFire);
+    if (cooldownLeft > 0) {
+      console.log('[Anarchist] Cooldown active —', Math.ceil(cooldownLeft / 1000) + 's left');
+      return;
+    }
     _burnoutLastFire = now;
+    console.log('[Anarchist] FIRING via', source);
     chrome.runtime.sendMessage({ action: 'startBurnoutAudio' });
     triggerBurnout();
+  }
+
+  function accumulate(delta, source) {
+    accumulated += delta;
+    console.log('[Anarchist] ' + source + ' +' + delta + ' | accumulated:', accumulated.toFixed(1), '/', SCROLL_THRESHOLD);
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { console.log('[Anarchist] Idle reset'); accumulated = 0; }, IDLE_RESET_MS);
+    if (accumulated < SCROLL_THRESHOLD) return;
+    accumulated = 0;
+    fire(source);
+  }
+
+  _burnoutScrollHandler = (e) => accumulate(Math.abs(e.deltaY || 0), 'wheel');
+  _burnoutScrollHandler._keyHandler = (e) => {
+    const delta = KEY_DELTA[e.code] || 0;
+    if (!delta) return;
+    accumulate(delta, 'key:' + e.code);
   };
 
-  const throttled = () => {
-    if (_scrollThrottle) return;
-    _scrollThrottle = setTimeout(() => {
-      _scrollThrottle = null;
-      _burnoutScrollHandler && _burnoutScrollHandler();
-    }, 500);
-  };
+  window.addEventListener('wheel', _burnoutScrollHandler, { passive: true, capture: true });
+  window.addEventListener('keydown', _burnoutScrollHandler._keyHandler, { capture: true });
 
-  window.addEventListener('scroll', throttled, { passive: true });
-  window.addEventListener('wheel', throttled, { passive: true, capture: true });
-  document.addEventListener('scroll', throttled, { passive: true, capture: true });
-  _burnoutScrollHandler._throttled = throttled;
-  console.log('[Anarchist] Burnout Mode ON');
+  // --- Time-based fallback for Chrome PDF plugin (swallows all events) ---
+  // Counts seconds the PDF page is focused; fires after FOCUS_TRIGGER_S seconds.
+  const FOCUS_TRIGGER_S = 10;
+  let focusedSeconds = 0;
+  let focusTimer = null;
+
+  function tickFocus() {
+    if (!document.hasFocus()) return;
+    focusedSeconds++;
+    console.log('[Anarchist] PDF focus tick:', focusedSeconds, '/', FOCUS_TRIGGER_S, 's');
+    if (focusedSeconds >= FOCUS_TRIGGER_S) {
+      focusedSeconds = 0;
+      fire('focus-timer');
+    }
+  }
+
+  if (isPdfPage()) {
+    focusTimer = setInterval(tickFocus, 1000);
+    console.log('[Anarchist] PDF focus timer started — will fire after', FOCUS_TRIGGER_S, 's of focused reading');
+  }
+
+  _burnoutScrollHandler._focusTimer = focusTimer;
 }
 
 function stopBurnoutMode() {
-  if (_burnoutScrollHandler && _burnoutScrollHandler._throttled) {
-    window.removeEventListener('scroll', _burnoutScrollHandler._throttled);
-    window.removeEventListener('wheel', _burnoutScrollHandler._throttled, { capture: true });
-    document.removeEventListener('scroll', _burnoutScrollHandler._throttled, { capture: true });
+  if (_burnoutScrollHandler) {
+    window.removeEventListener('wheel', _burnoutScrollHandler, { capture: true });
+    if (_burnoutScrollHandler._keyHandler) {
+      window.removeEventListener('keydown', _burnoutScrollHandler._keyHandler, { capture: true });
+    }
+    if (_burnoutScrollHandler._focusTimer) {
+      clearInterval(_burnoutScrollHandler._focusTimer);
+    }
   }
   _burnoutScrollHandler = null;
   chrome.runtime.sendMessage({ action: 'stopBurnoutAudio' });
@@ -734,7 +785,11 @@ chrome.storage.local.get('burnoutMode', (data) => {
 });
 
 function triggerBurnout() {
-  if (document.getElementById('anarchist-burnout-host')) return;
+  if (document.getElementById('anarchist-burnout-host')) {
+    console.log('[Anarchist] triggerBurnout() skipped — already running');
+    return;
+  }
+  console.log('[Anarchist] triggerBurnout() START');
 
   const lighterUrl = chrome.runtime.getURL('assets/lighter.png');
   const fireUrl    = chrome.runtime.getURL('assets/fire.png');
@@ -746,20 +801,30 @@ function triggerBurnout() {
   const FIRE_FRAMES = FIRE_GRID * FIRE_GRID;
   const FIRE_ANIM_SPEED = 3;
 
-  // Shadow DOM host — isolates our elements from the page's CSS/CSP
+  // Shadow DOM host — appended to <html> so it survives PDF viewer body replacement
   const host = document.createElement('div');
   host.id = 'anarchist-burnout-host';
-  Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '2147483647', pointerEvents: 'none' });
-  document.body.appendChild(host);
-  const shadow = host.attachShadow({ mode: 'closed' });
+  Object.assign(host.style, { position: 'fixed', inset: '0', zIndex: '2147483647', pointerEvents: 'none', display: 'block' });
+  (document.documentElement || document.body).appendChild(host);
+  console.log('[Anarchist] Host appended to:', document.documentElement ? '<html>' : '<body>');
+  const shadow = host.attachShadow({ mode: 'open' });
+  console.log('[Anarchist] Shadow root attached');
+
+  // Scoped styles inside the shadow root (shadow DOM ignores external CSS)
+  const styleTag = document.createElement('style');
+  styleTag.textContent = `
+    :host { all: initial; }
+    .burnout-root { position: absolute; inset: 0; width: 100vw; height: 100vh; overflow: hidden; pointer-events: none; }
+  `;
+  shadow.appendChild(styleTag);
 
   // Inner container inside shadow root
   const root = document.createElement('div');
-  Object.assign(root.style, { position: 'relative', width: '100%', height: '100%' });
+  root.className = 'burnout-root';
   shadow.appendChild(root);
 
   // Stickman
-  const stickyWrap = SpriteAnimator.createWalkWrapper('fixed');
+  const stickyWrap = SpriteAnimator.createWalkWrapper('absolute');
   const stickCanvas = SpriteAnimator.createCanvas();
   const stickImg = SpriteAnimator.loadImage();
   const stickCtx = stickCanvas.getContext('2d');
@@ -772,8 +837,8 @@ function triggerBurnout() {
   const lighterEl = document.createElement('img');
   lighterEl.src = lighterUrl;
   Object.assign(lighterEl.style, {
-    position: 'fixed', width: '48px', height: '48px', objectFit: 'contain',
-    display: 'none', zIndex: '2147483647', pointerEvents: 'none',
+    position: 'absolute', width: '48px', height: '48px', objectFit: 'contain',
+    display: 'none', pointerEvents: 'none',
     transformOrigin: 'center center'
   });
   root.appendChild(lighterEl);
@@ -784,7 +849,7 @@ function triggerBurnout() {
   for (let i = 0; i < tileCount; i++) {
     const tile = document.createElement('div');
     Object.assign(tile.style, {
-      position: 'fixed', bottom: '0px', left: (i * FIRE_FRAME_SIZE) + 'px',
+      position: 'absolute', bottom: '0px', left: (i * FIRE_FRAME_SIZE) + 'px',
       width: FIRE_FRAME_SIZE + 'px', height: FIRE_FRAME_SIZE + 'px',
       backgroundImage: `url(${fireUrl})`,
       backgroundSize: `${FIRE_FRAME_SIZE * FIRE_GRID}px ${FIRE_FRAME_SIZE * FIRE_GRID}px`,
@@ -857,7 +922,12 @@ function triggerBurnout() {
       walkTick++;
       const p = Math.min(walkTick / WALK_TICKS, 1);
       SpriteAnimator.slideX(stickyWrap, TARGET_X, START_X, p, SpriteAnimator.easeIn);
-      if (p >= 1) { cancelAnimationFrame(rafId); host.remove(); return; }
+      if (p >= 1) {
+        cancelAnimationFrame(rafId);
+        host.remove();
+        chrome.runtime.sendMessage({ action: 'burnoutDone' }); // closes music + tab
+        return;
+      }
     }
     rafId = requestAnimationFrame(tick);
   }
@@ -868,7 +938,7 @@ function triggerBurnout() {
     imgsDone.add(key);
     rafId = requestAnimationFrame(tick);
   }
-  stickImg.onload  = () => onImageDone('stick');
-  stickImg.onerror = () => onImageDone('stick');
-  if (stickImg.complete) onImageDone('stick');
+  stickImg.onload  = () => { console.log('[Anarchist] Sprite loaded — starting animation'); onImageDone('stick'); };
+  stickImg.onerror = () => { console.warn('[Anarchist] Sprite failed to load!'); onImageDone('stick'); };
+  if (stickImg.complete) { console.log('[Anarchist] Sprite already cached'); onImageDone('stick'); }
 }

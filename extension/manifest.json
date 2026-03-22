@@ -14,8 +14,7 @@
     "tts",
     "windows",
     "tabs",
-    "webNavigation",
-    "offscreen"
+    "webNavigation"
   ],
   "action": {
     "default_popup": "popup.html",

@@ -1,5 +1,5 @@
-
-const blacklist = ['github', 'gemini']
+const blacklist = ['gemini', 'github'];
+let burnoutMusicWindowId = null;
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
@@ -53,23 +53,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === 'startBurnoutAudio') {
-    (async () => {
-      try {
-        if (await chrome.offscreen.hasDocument()) return;
-        await chrome.offscreen.createDocument({
-          url: chrome.runtime.getURL('offscreen.html'),
-          reasons: ['AUDIO_PLAYBACK'],
-          justification: 'Burnout mode background music'
-        });
-      } catch (e) {
-        console.warn('[Anarchist] Offscreen audio error:', e);
-      }
-    })();
+    // If already open, just focus it
+    if (burnoutMusicWindowId !== null) {
+      chrome.windows.get(burnoutMusicWindowId, (win) => {
+        if (chrome.runtime.lastError || !win) {
+          burnoutMusicWindowId = null;
+        } else {
+          chrome.windows.update(burnoutMusicWindowId, { focused: true });
+        }
+      });
+      return;
+    }
+    chrome.windows.create({
+      url: 'https://www.youtube.com/watch?v=CGyEd0aKWZE&t=110',
+      type: 'popup',
+      width: 480,
+      height: 300
+    }, (win) => { burnoutMusicWindowId = win.id; });
     return;
   }
 
   if (message.action === 'stopBurnoutAudio') {
-    chrome.offscreen.closeDocument().catch(() => {});
+    if (burnoutMusicWindowId !== null) {
+      chrome.windows.remove(burnoutMusicWindowId).catch(() => {});
+      burnoutMusicWindowId = null;
+    }
+    return;
+  }
+
+  if (message.action === 'burnoutDone') {
+    // Close the music window
+    if (burnoutMusicWindowId !== null) {
+      chrome.windows.remove(burnoutMusicWindowId).catch(() => {});
+      burnoutMusicWindowId = null;
+    }
+    // Close the tab (or its whole window if it's the only tab)
+    if (sender.tab && sender.tab.id) {
+      chrome.tabs.query({ windowId: sender.tab.windowId }, (tabs) => {
+        if (tabs.length <= 1) {
+          chrome.windows.remove(sender.tab.windowId).catch(() => {});
+        } else {
+          chrome.tabs.remove(sender.tab.id).catch(() => {});
+        }
+      });
+    }
     return;
   }
 

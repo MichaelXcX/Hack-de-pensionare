@@ -79,7 +79,9 @@ const TTSController = (() => {
     const {
       stutterIntensity = 50,
       voiceName = 'en_us_006',
-      onStatus = null
+      onStatus = null,
+      onTooLong = null,
+      maxWords = 60
     } = options;
 
     const log = (msg) => {
@@ -89,6 +91,14 @@ const TTSController = (() => {
 
     speaking = true;
     cancelRequested = false;
+
+    // Check word count BEFORE stuttering — much more predictable threshold
+    const wordCount = text.trim().split(/\s+/).length;
+    if (onTooLong && wordCount > maxWords) {
+      speaking = false;
+      onTooLong(wordCount);
+      return;
+    }
 
     const stutterRate = StutterEngine.intensityToRate(stutterIntensity);
     const chunks = StutterEngine.stutterify(text, { stutterRate });
