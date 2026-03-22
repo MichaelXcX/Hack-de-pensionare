@@ -282,10 +282,9 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     delete lcTimers[tabId];
     chrome.alarms.clear(`lc_${tabId}`);
 
-
-     console.log("intraram in functie");
-     if (changeInfo.status !== 'complete' || !tab.url || !tab.url.startsWith("http")) return;
-     if (!isMeanModeSite(tab.url)) return;
+    console.log("intraram in functie");
+    if (changeInfo.status !== 'complete' || !tab.url || !tab.url.startsWith("http")) return;
+    if (!isMeanModeSite(tab.url)) return;
 
     chrome.storage.local.get('killModeActive', (data) => {
 
@@ -336,11 +335,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   const elapsed = Date.now() - timer.openedAt;
 
   if (elapsed >= CLOSE_AFTER_MS) {
-    chrome.storage.local.get(['killModeActive', 'lcRoastEnabled'], (data) => {
-      if (!data.killModeActive) {
+    chrome.storage.local.get('lcRoastEnabled', (data) => {
+     /* if (!data.killModeActive) {
         console.log('[Anarchist] Kill Mode is OFF. LeetCode tab spared.');
         return;
-      }
+      }*/
+     
       const msg = randomPhrase(LC_CLOSING_MESSAGES);
       const speak = data.lcRoastEnabled
         ? chrome.scripting.executeScript({
