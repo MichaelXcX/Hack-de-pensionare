@@ -149,11 +149,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   const timer = lcTimers[tabId];
   if (!timer) return;
 
-  // FIX 4: was `age`, variable is `elapsed`
   const elapsed = Date.now() - timer.openedAt;
 
   if (elapsed >= CLOSE_AFTER_MS) {
-    // FIX 5: use randomPhrase() and LC_CLOSING_MESSAGES (not lcRandom / LC_CLOSE_PHRASES)
     const msg = randomPhrase(LC_CLOSING_MESSAGES);
     chrome.scripting.executeScript({
       target: { tabId },
@@ -169,7 +167,6 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
   } else if (elapsed >= WARN_AFTER_MS && !timer.warned) {
     timer.warned = true;
-    // FIX 5: use randomPhrase() and LC_WARNINGS
     const msg = randomPhrase(LC_WARNINGS);
     chrome.scripting.executeScript({
       target: { tabId },
