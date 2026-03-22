@@ -99,6 +99,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'contextMenu':
       handleContextMenu(message);
       break;
+    case 'toggleMeanMode':
+      message.status ? startObserving() : stopObserving();
+      break;
   }
 });
 
@@ -167,15 +170,62 @@ function handleTouchGrass() {
     boxShadow: '0 4px 20px rgba(39,174,96,0.5)',
     transition: 'transform 0.1s'
   });
-  btn.addEventListener('mouseenter', () => btn.style.transform = 'scale(1.05)');
+  btn.addEventListener('mouseenter', () => { if (!btn.disabled) btn.style.transform = 'scale(1.05)'; });
   btn.addEventListener('mouseleave', () => btn.style.transform = 'scale(1.0)');
-  btn.addEventListener('click', () => {
+
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.style.cursor = 'not-allowed';
+    btn.textContent = 'Speaking...';
+
+    try {
+      // Fetch + play inside the click handler — user activation satisfies autoplay policy
+      const data = await new Promise(resolve => chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], resolve));
+      const voiceName = data.ttsVoice || 'en_us_006';
+      const stutterIntensity = data.stutterIntensity ?? 50;
+      const stutterRate = StutterEngine.intensityToRate(stutterIntensity);
+      const chunks = StutterEngine.stutterify("Maybe it's time to touch grass.", { stutterRate });
+      const stutteredText = StutterEngine.flatten(chunks);
+
+      // Chunk the text
+      const segments = [];
+      let current = '';
+      for (const word of stutteredText.split(' ')) {
+        const candidate = current ? current + ' ' + word : word;
+        if (current && candidate.length > 140) { segments.push(current); current = word; }
+        else current = candidate;
+      }
+      if (current.trim()) segments.push(current);
+
+      const urls = segments.map(seg =>
+        `https://api.flowery.pw/v1/tts?text=${encodeURIComponent(seg)}&voice=${encodeURIComponent(voiceName)}&silence=0&speed=1.0`
+      );
+
+      const resp = await new Promise(resolve => chrome.runtime.sendMessage({ action: 'fetchAudio', urls }, resolve));
+
+      if (resp && resp.ok) {
+        for (const r of resp.results) {
+          if (!r.ok) continue;
+          const binary = atob(r.base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const blobUrl = URL.createObjectURL(new Blob([bytes], { type: r.contentType }));
+          await new Promise(resolve => {
+            const audio = new Audio(blobUrl);
+            audio.onended = () => { URL.revokeObjectURL(blobUrl); resolve(); };
+            audio.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(); };
+            audio.play().catch(resolve);
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[Anarchist] Touch Grass TTS error:', e);
+    }
+
     overlay.remove();
-    setTimeout(() => {
-      alert('Good boy');
-      // Ask background to close all windows — window.close() can't do that
-      chrome.runtime.sendMessage({ action: 'closeAllWindows' });
-    }, 80);
+    chrome.runtime.sendMessage({ action: 'closeAllWindows' });
   });
 
   // Inject keyframe if not already present
@@ -219,14 +269,17 @@ function handleContextMenu(message) {
   }
 }
 
-// --- Auto-trigger Touch Grass randomly on page load (30% chance) ---
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
+// --- Auto-trigger Touch Grass randomly on page load (30% chance, if enabled) ---
+chrome.storage.local.get('touchGrassEnabled', (data) => {
+  if (!data.touchGrassEnabled) return;
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      if (Math.random() < 0.30) handleTouchGrass();
+    });
+  } else {
     if (Math.random() < 0.30) handleTouchGrass();
-  });
-} else {
-  if (Math.random() < 0.30) handleTouchGrass();
-}
+  }
+});
 
 // --- Toast notification helper ---
 function showToast(text) {
@@ -278,17 +331,9 @@ const getBurn = (category) => {
 };
 
 
-let meanModeInterval = null;
-
-// Check if mode is already on when a new tab opens
-chrome.storage.local.get("meanModeActive", (data) => {
+// Check if mean mode is already on when a new tab opens
+chrome.storage.local.get('meanModeActive', (data) => {
   if (data.meanModeActive) startObserving();
-});
-
-chrome.runtime.onMessage.addListener((message) => {
-  if (message.action === 'toggleMeanMode') {
-    message.status ? startObserving() : stopObserving();
-  }
 });
 
 function startObserving() {

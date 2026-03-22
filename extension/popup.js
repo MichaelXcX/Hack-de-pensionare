@@ -68,12 +68,60 @@ document.getElementById('btn-touch-grass').addEventListener('click', () => {
   });
 });
 
+// --- Auto Touch Grass toggle ---
+const btnTouchGrassToggle = document.getElementById('btn-touch-grass-toggle');
+
+function updateTouchGrassBtn(active) {
+  btnTouchGrassToggle.textContent = active ? '🌿 Auto Touch Grass: ON' : '🌿 Auto Touch Grass: OFF';
+  btnTouchGrassToggle.style.background = active ? '#27ae60' : '';
+}
+
+chrome.storage.local.get('touchGrassEnabled', (data) => {
+  updateTouchGrassBtn(!!data.touchGrassEnabled);
+});
+
+btnTouchGrassToggle.addEventListener('click', () => {
+  chrome.storage.local.get('touchGrassEnabled', (data) => {
+    const newState = !data.touchGrassEnabled;
+    chrome.storage.local.set({ touchGrassEnabled: newState }, () => {
+      updateTouchGrassBtn(newState);
+    });
+  });
+});
+
 // --- Inside popup.js ---
 document.getElementById('btn-feature-3').addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'feature3' }, (response) => {
     const statusDiv = document.getElementById('status');
     statusDiv.textContent = response.status;
     setTimeout(() => statusDiv.textContent = "", 2000);
+  });
+});
+
+// --- Mean Mode toggle ---
+const btnMeanMode = document.getElementById('btn-mean-mode');
+
+function updateMeanBtn(active) {
+  btnMeanMode.textContent = active ? '😈 Mean Mode: ON' : '😈 Mean Mode: OFF';
+  btnMeanMode.style.background = active ? '#e94560' : '';
+}
+
+chrome.storage.local.get('meanModeActive', (data) => {
+  updateMeanBtn(!!data.meanModeActive);
+});
+
+btnMeanMode.addEventListener('click', () => {
+  chrome.storage.local.get('meanModeActive', (data) => {
+    const newState = !data.meanModeActive;
+    chrome.storage.local.set({ meanModeActive: newState }, () => {
+      updateMeanBtn(newState);
+      // Send to all tabs
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+          chrome.tabs.sendMessage(tab.id, { action: 'toggleMeanMode', status: newState }).catch(() => {});
+        });
+      });
+    });
   });
 });
 
