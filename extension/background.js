@@ -150,15 +150,17 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     const msg = randomPhrase(LC_CLOSING_MESSAGES);
     chrome.scripting.executeScript({
       target: { tabId },
-      func: (msg) => {
-        if (window.__lcStickmanSpeak) window.__lcStickmanSpeak(msg, 'roast');
+      func: async (msg) => {
+        if (window.__lcStickmanSpeak) await window.__lcStickmanSpeak(msg, 'roast');
       },
       args: [msg],
-    }).catch(() => {});
-    setTimeout(() => {
+    }).then (() => {;
       chrome.tabs.remove(tabId).catch(() => {});
       delete lcTimers[tabId];
-    }, 4000);
+    }).catch(() => {
+      chrome.tabs.remove(tabId).catch(() => {});
+      delete lcTimers[tabId];
+    });
 
   } else if (elapsed >= WARN_AFTER_MS && !timer.warned) {
     timer.warned = true;

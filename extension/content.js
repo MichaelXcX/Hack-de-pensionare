@@ -521,6 +521,7 @@ function initStickman() {
   document.body.appendChild(wrapper);
 }
 
+
 function stickmanSpeak(text, mood) {
   mood = mood || 'neutral';
   const wrapper = document.getElementById('__anarchist_stickman__');
@@ -530,30 +531,35 @@ function stickmanSpeak(text, mood) {
   bubble.textContent = text;
   bubble.classList.add('visible');
 
-  // Use Flowery TTS instead of browser speechSynthesis
-  chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
-    const voiceName = data.ttsVoice || 'en_us_006';
-    const stutterIntensity = data.stutterIntensity ?? 50;
-
-    TTSController.speakWithStutter(text, {
-      stutterIntensity,
-      voiceName,
-      onStatus: null
-    }).catch(() => {
-      // Fallback to speechSynthesis if Flowery fails
-      if (window.speechSynthesis) {
-        const u = new SpeechSynthesisUtterance(text);
-        u.rate  = mood === 'roast' ? 1.35 : 1.0;
-        u.pitch = mood === 'roast' ? 1.2  : 1.0;
-        window.speechSynthesis.speak(u);
-      }
+ return new Promise((resolve) => {
+    chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
+      const voiceName = data.ttsVoice || 'en_us_006';
+      const stutterIntensity = data.stutterIntensity ?? 50;
+ 
+      TTSController.speakWithStutter(text, {
+        stutterIntensity,
+        voiceName,
+        onStatus: null
+      }).then(() => {
+        bubble.classList.remove('visible');
+        resolve();
+      }).catch(() => {
+        // Fallback to browser speechSynthesis if Flowery fails
+        if (window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+          const u = new SpeechSynthesisUtterance(text);
+          u.rate  = mood === 'roast' ? 1.35 : 1.0;
+          u.pitch = mood === 'roast' ? 1.2  : 1.0;
+          u.onend  = () => { bubble.classList.remove('visible'); resolve(); };
+          u.onerror = () => { bubble.classList.remove('visible'); resolve(); };
+          window.speechSynthesis.speak(u);
+        } else {
+          bubble.classList.remove('visible');
+          resolve();
+        }
+      });
     });
   });
-
-  const duration = Math.max(3500, text.length * 80);
-  setTimeout(() => {
-    bubble.classList.remove('visible');
-  }, duration);
 }
 // Exposed globally so background.js can reach it via executeScript
 window.__lcStickmanSpeak = stickmanSpeak;
@@ -587,7 +593,6 @@ function initRoastObserver() {
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
-// FIX 7: LeetCode block is now at the bottom — everything above is defined
 if (location.hostname.includes('leetcode.com')) {
   initStickman();
   initRoastObserver();
