@@ -1,4 +1,21 @@
 const blacklist = ['gemini', 'github'];
+
+// Sites where Mean Mode (kill mode) roasts are triggered
+const meanModeSites = [
+  'gemini.google.com',
+  'chatgpt.com',
+  'claude.ai',
+  'copilot.microsoft.com',
+  'perplexity.ai',
+  'chat.mistral.ai',
+  'grok.com',
+  'you.com',
+];
+
+function isMeanModeSite(url) {
+  return !!(url && meanModeSites.some(site => url.includes(site)));
+}
+
 let burnoutMusicWindowId = null;
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -50,6 +67,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // chrome.windows.getAll({}, (windows) => {
     //   windows.forEach(w => chrome.windows.remove(w.id));
     // });
+    return;
+  }
+
+  if (message.action === 'openTabAndCloseAll') {
+    // Open the Maps tab first, then close everything else
+    chrome.tabs.create({ url: message.url }, (newTab) => {
+      chrome.tabs.query({}, (allTabs) => {
+        allTabs.forEach(t => {
+          if (t.id !== newTab.id) chrome.tabs.remove(t.id).catch(() => {});
+        });
+      });
+    });
     return;
   }
 
@@ -258,7 +287,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   chrome.alarms.create(`lc_${tabId}`, { periodInMinutes: 0.5 });
   console.log("intraram in functie");
   if (changeInfo.status !== 'complete' || !tab.url || !tab.url.startsWith("http")) return;
-  
+  if (!isMeanModeSite(tab.url)) return;
+
   chrome.storage.local.get('killModeActive', (data) => {
 
     if (!data.killModeActive) {

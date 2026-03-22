@@ -204,7 +204,21 @@ function handleTouchGrass() {
       container: overlay,
       onDone: () => {
         overlay.remove();
-        chrome.runtime.sendMessage({ action: 'closeAllWindows' });
+        // Open nearest park on Google Maps, then close all other windows
+        const openMapsAndClose = (url) => {
+          chrome.runtime.sendMessage({ action: 'openTabAndCloseAll', url });
+        };
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => openMapsAndClose(
+              `https://www.google.com/maps/search/park/@${pos.coords.latitude},${pos.coords.longitude},15z`
+            ),
+            () => openMapsAndClose('https://www.google.com/maps/search/parks+near+me'),
+            { timeout: 5000 }
+          );
+        } else {
+          openMapsAndClose('https://www.google.com/maps/search/parks+near+me');
+        }
       }
     });
   });
