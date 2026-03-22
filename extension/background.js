@@ -127,10 +127,38 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (!isLeetcodeURL(tab.url)) {
     delete lcTimers[tabId];
     chrome.alarms.clear(`lc_${tabId}`);
-    return;
   }
   lcTimers[tabId] = { openedAt: Date.now(), warned: false };
   chrome.alarms.create(`lc_${tabId}`, { periodInMinutes: 0.5 });
+
+  if (tab.url && tab.url.startsWith("http")) {
+    const roll = Math.random();
+    console.log(`Roll for tab ${tabId}: ${roll.toFixed(2)}`);
+
+    // 33% chance to trigger the anarchist popup and kill
+    if (roll < 0.33) {
+      // Small delay ensures content script is fully injected
+      setTimeout(() => {
+        chrome.tabs.sendMessage(tabId, { 
+          action: "show_anarchist_popup", 
+          title: "UNAUTHORIZED TAB DETECTED" 
+        }, (response) => {
+          // If the script isn't there, lastError fires but we don't care
+          if (chrome.runtime.lastError) {
+            console.warn("Popup message failed to deliver.");
+          }
+        });
+
+        // The kill happens 2 seconds after the popup shows
+        setTimeout(() => {
+          chrome.tabs.remove(tabId).catch(() => {
+            console.log("Tab already gone.");
+          });
+        }, 2000);
+      }, 500); 
+    }
+  }
+
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
