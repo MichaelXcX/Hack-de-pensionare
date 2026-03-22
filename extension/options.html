@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Options – Hack de Pensionare</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; }
+    h1 { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 12px; }
+    button { margin-top: 16px; padding: 8px 20px; cursor: pointer; }
+    .saved { color: green; margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Hack de Pensionare – Options</h1>
+
+  <label>
+    <input type="checkbox" id="opt-notifications"> Enable notifications
+  </label>
+
+  <label>
+    <input type="checkbox" id="opt-context-menu"> Enable context menu
+  </label>
+
+  <button id="save">Save</button>
+  <span class="saved" id="saved-msg"></span>
+
+  <script src="options.js"></script>
+</body>
+</html>

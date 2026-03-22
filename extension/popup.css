@@ -1,0 +1,114 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 350px;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #1a1a2e;
+  color: #eee;
+}
+
+.container {
+  padding: 16px;
+}
+
+h1 {
+  font-size: 18px;
+  text-align: center;
+  margin-bottom: 12px;
+  color: #e94560;
+}
+
+h2 {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  flex: 1;
+  padding: 8px 4px;
+  border: none;
+  background: #16213e;
+  color: #aaa;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.tab:hover {
+  background: #0f3460;
+  color: #fff;
+}
+
+.tab.active {
+  background: #e94560;
+  color: #fff;
+}
+
+/* Tab content */
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Feature buttons */
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.feature-btn {
+  padding: 10px;
+  border: none;
+  background: #0f3460;
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.feature-btn:hover {
+  background: #e94560;
+}
+
+/* Status */
+.status {
+  margin-top: 10px;
+  padding: 8px;
+  font-size: 13px;
+  color: #53d769;
+  text-align: center;
+  min-height: 20px;
+}
+
+/* Settings */
+label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+a {
+  color: #e94560;
+  font-size: 13px;
+}
