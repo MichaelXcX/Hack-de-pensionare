@@ -129,13 +129,10 @@ function randomPhrase(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// FIX 1: destructure { tabId } correctly
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   chrome.tabs.get(tabId, (tab) => {
-    // FIX 2: use isLeetcodeURL (not isLeetcode)
     if (chrome.runtime.lastError || !isLeetcodeURL(tab.url)) return;
     if (!lcTimers[tabId]) {
-      // FIX 3: lowercase openedAt and warned
       lcTimers[tabId] = { openedAt: Date.now(), warned: false };
     }
     chrome.alarms.create(`lc_${tabId}`, { periodInMinutes: 0.5 });
@@ -144,7 +141,6 @@ chrome.tabs.onActivated.addListener(({ tabId }) => {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status !== 'complete') return;
-  // FIX 2: use isLeetcodeURL (not isLeetcode)
   if (!isLeetcodeURL(tab.url)) {
     delete lcTimers[tabId];
     chrome.alarms.clear(`lc_${tabId}`);
@@ -192,36 +188,37 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   const elapsed = Date.now() - timer.openedAt;
 
   if (elapsed >= CLOSE_AFTER_MS) {
-    chrome.storage.local.get('killModeActive', (data) => {
+    chrome.storage.local.get(['killModeActive', 'lcRoastEnabled'], (data) => {
       if (!data.killModeActive) {
         console.log('[Anarchist] Kill Mode is OFF. LeetCode tab spared.');
         return;
       }
-    const msg = randomPhrase(LC_CLOSING_MESSAGES);
-    chrome.scripting.executeScript({
-      target: { tabId },
-      func: async (msg) => {
-        if (window.__lcStickmanSpeak) await window.__lcStickmanSpeak(msg, 'roast');
-      },
-      args: [msg],
-    }).then(() => {
-      chrome.tabs.remove(tabId).catch(() => {});
-      delete lcTimers[tabId];
-    }).catch(() => {
-      chrome.tabs.remove(tabId).catch(() => {});
-      delete lcTimers[tabId];
+      const msg = randomPhrase(LC_CLOSING_MESSAGES);
+      const speak = data.lcRoastEnabled
+        ? chrome.scripting.executeScript({
+            target: { tabId },
+            func: async (msg) => { if (window.__lcStickmanSpeak) await window.__lcStickmanSpeak(msg, 'roast'); },
+            args: [msg],
+          })
+        : Promise.resolve();
+      speak.then(() => {
+        chrome.tabs.remove(tabId).catch(() => {});
+        delete lcTimers[tabId];
+      }).catch(() => {
+        chrome.tabs.remove(tabId).catch(() => {});
+        delete lcTimers[tabId];
+      });
     });
-    }); // end killModeActive check
-
   } else if (elapsed >= WARN_AFTER_MS && !timer.warned) {
     timer.warned = true;
-    const msg = randomPhrase(LC_WARNINGS);
-    chrome.scripting.executeScript({
-      target: { tabId },
-      func: (msg) => {
-        if (window.__lcStickmanSpeak) window.__lcStickmanSpeak(msg, 'roast');
-      },
-      args: [msg],
-    }).catch(() => {});
+    chrome.storage.local.get('lcRoastEnabled', (data) => {
+      if (!data.lcRoastEnabled) return;
+      const msg = randomPhrase(LC_WARNINGS);
+      chrome.scripting.executeScript({
+        target: { tabId },
+        func: (msg) => { if (window.__lcStickmanSpeak) window.__lcStickmanSpeak(msg, 'roast'); },
+        args: [msg],
+      }).catch(() => {});
+    });
   }
 });
