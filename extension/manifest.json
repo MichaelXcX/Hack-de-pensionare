@@ -12,14 +12,16 @@
     "scripting",
     "alarms",
     "tts",
-    "windows"
+    "windows",
+    "tabs",
+    "webNavigation"
   ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "16": "icons/pngwing.com.png",
+      "48": "icons/pngwing.com.png",
+      "128": "icons/pngwing.com.png"
     }
   },
   "background": {
@@ -28,8 +30,9 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["stutter.js", "tts.js", "content.js"],
-      "css": ["content.css"]
+      "js": ["content.js", "stutter.js", "tts.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
     }
   ],
   "options_page": "options.html",

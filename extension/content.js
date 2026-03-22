@@ -106,6 +106,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'toggleMeanMode':
       message.status ? startObserving() : stopObserving();
       break;
+    case 'show_anarchist_popup':
+  showChaosPopup(message.title); // Calls your green/black box function
+  sendResponse({ status: "Popup displayed" }); // Clears the 'undefined' log
+  break;
   }
 });
 
@@ -596,4 +600,27 @@ function initRoastObserver() {
 if (location.hostname.includes('leetcode.com')) {
   initStickman();
   initRoastObserver();
+}
+
+//Tab killing
+function showChaosPopup(titleText) {
+  const existing = document.getElementById('anarchist-popup');
+  if (existing) existing.remove();
+
+  const div = document.createElement('div');
+  div.id = 'anarchist-popup';
+  div.innerHTML = `
+    <div style="font-weight:bold; border-bottom:1px solid #00ff00; margin-bottom:8px;">⚠️ SYSTEM ANARCHY</div>
+    <div style="font-size:14px; color:#00ff00;">${titleText}</div>
+    <div style="font-size:10px; margin-top:10px; color:red;">TERMINATING...</div>
+  `;
+
+  Object.assign(div.style, {
+    position: 'fixed', top: '40px', right: '40px', width: '250px',
+    backgroundColor: '#000', color: '#00ff00', padding: '20px',
+    fontFamily: 'monospace', border: '2px solid #00ff00', zIndex: '2147483647',
+    boxShadow: '10px 10px 0px #ff0000', pointerEvents: 'none'
+  });
+
+  document.body.appendChild(div);
 }
