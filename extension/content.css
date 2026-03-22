@@ -20,3 +20,66 @@
   80% { opacity: 1; }
   100% { opacity: 0; }
 }
+
+#anarchist-sel-btn {
+  position: fixed;
+  z-index: 2147483646;
+  background: #e94560;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-family: system-ui, sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.35);
+  white-space: nowrap;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  animation: anarchist-popscale 0.15s ease;
+  transition: background 0.15s;
+}
+
+#anarchist-sel-btn:hover {
+  background: #c0392b;
+}
+
+@keyframes anarchist-popscale {
+  from { transform: scale(0.7); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+#anarchist-status-bar {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a2e;
+  color: #eee;
+  border: 1px solid #e94560;
+  border-radius: 24px;
+  padding: 8px 20px;
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+  z-index: 999998;
+  display: none;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+
+#anarchist-status-bar .anarchist-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #e94560;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: anarchist-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes anarchist-spin {
+  to { transform: rotate(360deg); }
+}

@@ -78,8 +78,14 @@ const TTSController = (() => {
 
     const {
       stutterIntensity = 50,
-      voiceName = 'en_us_006'
+      voiceName = 'en_us_006',
+      onStatus = null
     } = options;
+
+    const log = (msg) => {
+      console.log('[Anarchist TTS]', msg);
+      if (onStatus) onStatus(msg);
+    };
 
     speaking = true;
     cancelRequested = false;
@@ -91,16 +97,19 @@ const TTSController = (() => {
 
     if (!segments.length) { speaking = false; return; }
 
-    // Build all URLs and batch-fetch in one background message (SW stays alive, no wake gaps)
+    log(`Fetching audio — ${segments.length} segment${segments.length !== 1 ? 's' : ''}...`);
+
     const urls = segments.map(seg =>
       `https://api.flowery.pw/v1/tts?text=${encodeURIComponent(seg)}&voice=${encodeURIComponent(voiceName)}&silence=0&speed=1.0`
     );
 
     try {
       const blobUrls = await fetchAllAudio(urls);
-      for (const blobUrl of blobUrls) {
-        if (cancelRequested) { URL.revokeObjectURL(blobUrl); break; }
-        await playBlobUrl(blobUrl);
+      log('Speaking...');
+      for (let i = 0; i < blobUrls.length; i++) {
+        if (cancelRequested) { URL.revokeObjectURL(blobUrls[i]); break; }
+        if (blobUrls.length > 1) log(`Speaking segment ${i + 1}/${blobUrls.length}...`);
+        await playBlobUrl(blobUrls[i]);
       }
     } finally {
       speaking = false;

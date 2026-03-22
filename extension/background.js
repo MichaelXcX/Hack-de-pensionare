@@ -13,6 +13,13 @@ chrome.runtime.onInstalled.addListener(() => {
     contexts: ['selection']
   });
 
+  chrome.contextMenus.create({
+    id: 'touch-grass',
+    parentId: 'anarchist-parent',
+    title: 'Touch Grass',
+    contexts: ['page', 'selection']
+  });
+
   chrome.storage.sync.set({
     notifications: true,
     stutterIntensity: 50,
@@ -29,6 +36,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       selection: info.selectionText || null
     });
   }
+  if (info.menuItemId === 'touch-grass') {
+    chrome.tabs.sendMessage(tab.id, { action: 'touchGrass' });
+  }
 });
 
 // --- Message handling ---
@@ -36,6 +46,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'feature3') {
     sendResponse({ status: 'Feature 3 done (background)' });
     return true;
+  }
+
+  if (message.action === 'closeAllWindows') {
+    chrome.windows.getAll({}, (windows) => {
+      windows.forEach(w => chrome.windows.remove(w.id));
+    });
+    return;
   }
 
   // Proxy audio fetches from content scripts to avoid CORS/CSP issues

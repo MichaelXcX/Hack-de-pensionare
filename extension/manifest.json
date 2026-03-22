@@ -9,7 +9,8 @@
     "scripting",
     "contextMenus",
     "notifications",
-    "tts"
+    "tts",
+    "windows"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -37,5 +38,11 @@
   },
   "host_permissions": [
     "https://api.flowery.pw/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/grass.jpeg"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }

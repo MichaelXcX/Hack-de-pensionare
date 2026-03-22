@@ -61,10 +61,10 @@ btnStop.addEventListener('click', () => {
   btnStop.disabled = true;
 });
 
-document.getElementById('btn-feature-2').addEventListener('click', () => {
+document.getElementById('btn-touch-grass').addEventListener('click', () => {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, { action: 'feature2' });
-    status.textContent = 'Feature 2 activated';
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'touchGrass' });
+    window.close();
   });
 });
 
