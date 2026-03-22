@@ -176,59 +176,19 @@ function handleTouchGrass() {
   btn.addEventListener('mouseenter', () => { if (!btn.disabled) btn.style.transform = 'scale(1.05)'; });
   btn.addEventListener('mouseleave', () => btn.style.transform = 'scale(1.0)');
 
-  btn.addEventListener('click', async () => {
+  btn.addEventListener('click', () => {
     if (btn.disabled) return;
     btn.disabled = true;
     btn.style.opacity = '0.5';
     btn.style.cursor = 'not-allowed';
-    btn.textContent = 'Speaking...';
 
-    try {
-      // Fetch + play inside the click handler — user activation satisfies autoplay policy
-      const data = await new Promise(resolve => chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], resolve));
-      const voiceName = data.ttsVoice || 'en_us_006';
-      const stutterIntensity = data.stutterIntensity ?? 50;
-      const stutterRate = StutterEngine.intensityToRate(stutterIntensity);
-      const chunks = StutterEngine.stutterify("Maybe it's time to touch grass.", { stutterRate });
-      const stutteredText = StutterEngine.flatten(chunks);
-
-      // Chunk the text
-      const segments = [];
-      let current = '';
-      for (const word of stutteredText.split(' ')) {
-        const candidate = current ? current + ' ' + word : word;
-        if (current && candidate.length > 140) { segments.push(current); current = word; }
-        else current = candidate;
+    showMeanBurn("Maybe it's time to touch grass.", {
+      container: overlay,
+      onDone: () => {
+        overlay.remove();
+        chrome.runtime.sendMessage({ action: 'closeAllWindows' });
       }
-      if (current.trim()) segments.push(current);
-
-      const urls = segments.map(seg =>
-        `https://api.flowery.pw/v1/tts?text=${encodeURIComponent(seg)}&voice=${encodeURIComponent(voiceName)}&silence=0&speed=1.0`
-      );
-
-      const resp = await new Promise(resolve => chrome.runtime.sendMessage({ action: 'fetchAudio', urls }, resolve));
-
-      if (resp && resp.ok) {
-        for (const r of resp.results) {
-          if (!r.ok) continue;
-          const binary = atob(r.base64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          const blobUrl = URL.createObjectURL(new Blob([bytes], { type: r.contentType }));
-          await new Promise(resolve => {
-            const audio = new Audio(blobUrl);
-            audio.onended = () => { URL.revokeObjectURL(blobUrl); resolve(); };
-            audio.onerror = () => { URL.revokeObjectURL(blobUrl); resolve(); };
-            audio.play().catch(resolve);
-          });
-        }
-      }
-    } catch (e) {
-      console.error('[Anarchist] Touch Grass TTS error:', e);
-    }
-
-    overlay.remove();
-    chrome.runtime.sendMessage({ action: 'closeAllWindows' });
+    });
   });
 
   if (!document.getElementById('anarchist-styles')) {
@@ -284,6 +244,195 @@ chrome.storage.local.get('touchGrassEnabled', (data) => {
 });
 
 // --- Toast notification helper ---
+// --- Mean Mode: stickman walk-in then show burn ---
+function showMeanBurn(message, opts = {}) {
+  const container  = opts.container || document.body;
+  const onDone     = opts.onDone   || null;
+  const positioned = container === document.body ? 'fixed' : 'absolute';
+
+  // Remove any existing stickman
+  const existing = document.getElementById('anarchist-stickman');
+  if (existing) existing.remove();
+
+  // Start TTS immediately (parallel to animation) — walkout triggers when speech ends
+  let ttsPromise;
+  chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
+    const voiceName        = data.ttsVoice         || 'en_us_006';
+    const stutterIntensity = data.stutterIntensity  ?? 50;
+    ttsPromise = TTSController.speakWithStutter(message, { stutterIntensity, voiceName, onStatus: () => {} })
+      .catch(e => console.warn('[Anarchist] stickman TTS error:', e));
+    // If already waiting for TTS (salute finished before storage resolved), kick off walkout
+    if (phase === 'idle') startWalkout();
+  });
+  const spriteUrl = chrome.runtime.getURL('assets/alex_sprite.png');
+  const CHAR_W = 90;   // rendered width of the stickman
+  const CHAR_H = 120;  // rendered height
+  const WALK_ROW = 1;  // row index for walking
+  const TOTAL_FRAMES = 10;
+  const HEADER_RATIO = 0.10;
+  const ANIM_SPEED = 4; // frames of rAF per sprite frame
+
+  // Container pinned to bottom-right, starts off-screen
+  const wrap = document.createElement('div');
+  wrap.id = 'anarchist-stickman';
+  Object.assign(wrap.style, {
+    position: positioned,
+    bottom: '70px',
+    right: '0px',
+    zIndex: '2147483647',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    transform: `translateX(${CHAR_W + 20}px)`,
+    transition: 'transform 0s'
+  });
+
+  // Speech bubble (hidden initially)
+  const bubble = document.createElement('div');
+  Object.assign(bubble.style, {
+    background: '#fff',
+    border: '2px solid #333',
+    borderRadius: '10px',
+    padding: '8px 12px',
+    marginBottom: '6px',
+    maxWidth: '220px',
+    fontSize: '13px',
+    fontFamily: 'system-ui, sans-serif',
+    fontWeight: 'bold',
+    color: '#222',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+    opacity: '0',
+    transition: 'opacity 0.4s',
+    textAlign: 'center',
+    position: 'relative'
+  });
+  bubble.textContent = message;
+  // little triangle at bottom-right
+  const tri = document.createElement('div');
+  Object.assign(tri.style, {
+    position: 'absolute',
+    bottom: '-10px',
+    right: '18px',
+    width: '0',
+    height: '0',
+    borderLeft: '8px solid transparent',
+    borderRight: '8px solid transparent',
+    borderTop: '10px solid #333'
+  });
+  bubble.appendChild(tri);
+
+  // Canvas for sprite
+  const canvas = document.createElement('canvas');
+  canvas.width = CHAR_W;
+  canvas.height = CHAR_H;
+  Object.assign(canvas.style, { display: 'block', imageRendering: 'pixelated' });
+
+  wrap.appendChild(bubble);
+  wrap.appendChild(canvas);
+  container.appendChild(wrap);
+
+  const ctx = canvas.getContext('2d');
+  const img = new Image();
+  img.src = spriteUrl;
+
+  let frameCount = 0;
+  let currentFrame = 0;
+  let phase = 'walkin'; // 'walkin' | 'idle' | 'walkout'
+  let facing = 'left'; // faces left when walking in, right when walking out
+  let rafId;
+
+  // Walk-in: slide from right edge to resting position (16px from right)
+  const TARGET_X = 0; // translateX target (0 = resting at right edge)
+  const START_X = CHAR_W + 20;
+  const WALK_DURATION = 80; // rAF ticks for walk-in
+  let walkTick = 0;
+
+  function drawFrame(row, frame) {
+    ctx.clearRect(0, 0, CHAR_W, CHAR_H);
+    if (!img.complete || !img.naturalWidth) return;
+    const fw = img.naturalWidth / TOTAL_FRAMES;
+    const headerOff = img.naturalHeight * HEADER_RATIO;
+    const fh = (img.naturalHeight * (1 - HEADER_RATIO)) / 5;
+    ctx.save();
+    if (facing === 'left') {
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, frame * fw, headerOff + row * fh, fw, fh, -CHAR_W, 0, CHAR_W, CHAR_H);
+    } else {
+      ctx.drawImage(img, frame * fw, headerOff + row * fh, fw, fh, 0, 0, CHAR_W, CHAR_H);
+    }
+    ctx.restore();
+  }
+  let walkoutScheduled = false;
+  function startWalkout() {
+    if (walkoutScheduled) return;
+    if (!ttsPromise) return; // storage not resolved yet — will be called again after
+    walkoutScheduled = true;
+    ttsPromise.then(() => {
+      phase = 'walkout';
+      facing = 'right';
+      bubble.style.opacity = '0';
+      walkTick = 0;
+    });
+  }
+
+  const SALUTE_ROW = 4;  // row 4 = salute
+  const SALUTE_HOLD = 80; // rAF ticks to hold the salute (~1.3s)
+  let saluteTick = 0;
+
+  function tick() {
+    if (phase === 'salute' || phase === 'idle') {
+      // Static poses — no frame cycling
+      const row = phase === 'salute' ? SALUTE_ROW : IDLE_ROW;
+      drawFrame(row, 0);
+    } else {
+      // Advance sprite frame for walking
+      frameCount++;
+      if (frameCount >= ANIM_SPEED) {
+        frameCount = 0;
+        currentFrame = (currentFrame + 1) % TOTAL_FRAMES;
+      }
+      drawFrame(WALK_ROW, currentFrame);
+    }
+
+    if (phase === 'walkin') {
+      walkTick++;
+      const progress = Math.min(walkTick / WALK_DURATION, 1);
+      const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const x = START_X + (TARGET_X - START_X) * ease;
+      wrap.style.transform = `translateX(${x}px)`;
+      if (progress >= 1) {
+        phase = 'salute';
+        saluteTick = 0;
+      }
+    } else if (phase === 'salute') {
+      saluteTick++;
+      if (saluteTick >= SALUTE_HOLD) {
+        phase = 'idle';
+        facing = 'left';
+        // Show speech bubble after salute, then walk out when TTS is done
+        bubble.style.opacity = '1';
+        startWalkout();
+      }
+    } else if (phase === 'walkout') {
+      walkTick++;
+      const progress = Math.min(walkTick / WALK_DURATION, 1);
+      const ease = Math.pow(progress, 3); // ease-in cubic
+      const x = TARGET_X + (START_X - TARGET_X) * ease;
+      wrap.style.transform = `translateX(${x}px)`;
+      if (progress >= 1) {
+        cancelAnimationFrame(rafId);
+        wrap.remove();
+        onDone?.();
+        return;
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  img.onload = () => { rafId = requestAnimationFrame(tick); };
+  if (img.complete && img.naturalWidth) rafId = requestAnimationFrame(tick);
+}
+
 function showToast(text) {
   document.querySelectorAll('.hdp-toast').forEach(t => t.remove());
   const toast = document.createElement('div');
@@ -341,7 +490,7 @@ function startObserving() {
   // 1. Detect Brightness (Mean Dark Mode check)
   const bgColor = window.getComputedStyle(document.body).backgroundColor;
   if (bgColor.includes("255, 255, 255")) {
-    showToast(getBurn('white_bg'));
+    showMeanBurn(getBurn('white_bg'));
   }
 
   // 2. Watch for "Stupid" interactions
@@ -359,7 +508,7 @@ function startObserving() {
     const isBuying = buyKeywords.some(keyword => btnText.includes(keyword));
 
     if (isBuying) {
-      showToast(getBurn('shopping')); // Triggers your mean shopping burn
+      showMeanBurn(getBurn('shopping'));
     }
   }
 });
@@ -370,7 +519,7 @@ function startObserving() {
     if (text.includes("moodle")) {
       // Use a debounce or a flag so it doesn't spam toasts
       if (!window.recentlyInsulted) {
-        showToast(getBurn('nerd'));
+        showMeanBurn(getBurn('nerd'));
         window.recentlyInsulted = true;
         setTimeout(() => window.recentlyInsulted = false, 10000);
       }
@@ -379,7 +528,7 @@ function startObserving() {
     if (text.includes("how do i") || text.includes("chatgpt") || text.includes("gemini") || text.includes("claude") || text.includes("how to")) {
       // Use a debounce or a flag so it doesn't spam toasts
       if (!window.recentlyInsulted) {
-        showToast(getBurn('ai'));
+        showMeanBurn(getBurn('ai'));
         window.recentlyInsulted = true;
         setTimeout(() => window.recentlyInsulted = false, 10000);
       }

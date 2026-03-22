@@ -44,10 +44,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": [
-        "assets/grass.jpeg",
-        "assets/stick-push.svg"
-    ],
+      "resources": ["assets/grass.jpeg", "assets/alex_sprite.png", "assets/stick-push.svg"],
       "matches": ["<all_urls>"]
     }
   ]
