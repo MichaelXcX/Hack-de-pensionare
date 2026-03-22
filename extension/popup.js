@@ -138,7 +138,7 @@ btnKillMode.addEventListener('click', () => {
 // --- LeetCode Roast ---
 const btnLeetCodeRoast = document.getElementById('btn-leetcode-roast');
 function updateLcRoastBtn(active) {
-  btnLeetCodeRoast.textContent = active ? '🔥 LeetCode Roast: ON' : '🔥 LeetCode Roast: OFF';
+  btnLeetCodeRoast.textContent = active ? '🧠 LeetCode Roast: ON' : '🧠 LeetCode Roast: OFF';
   btnLeetCodeRoast.style.background = active ? '#7c3ccf' : '';
 }
 
