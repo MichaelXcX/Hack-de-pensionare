@@ -112,3 +112,36 @@ a {
   color: #e94560;
   font-size: 13px;
 }
+
+/* Stop button */
+.stop-btn {
+  background: #533;
+}
+
+.stop-btn:hover:not(:disabled) {
+  background: #c0392b;
+}
+
+.stop-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Intensity slider */
+.intensity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.intensity-row label {
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.intensity-row input[type="range"] {
+  flex: 1;
+  accent-color: #e94560;
+}

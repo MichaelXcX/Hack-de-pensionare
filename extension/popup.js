@@ -10,12 +10,55 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 // --- Feature buttons ---
 const status = document.getElementById('status');
+const btnSpeak = document.getElementById('btn-stutter-speak');
+const btnStop = document.getElementById('btn-stop-speak');
+const intensitySlider = document.getElementById('intensity-slider');
+const intensityValue = document.getElementById('intensity-value');
 
-document.getElementById('btn-feature-1').addEventListener('click', () => {
+// Load saved intensity
+chrome.storage.sync.get('stutterIntensity', (data) => {
+  const val = data.stutterIntensity ?? 50;
+  intensitySlider.value = val;
+  intensityValue.textContent = val + '%';
+});
+
+intensitySlider.addEventListener('input', () => {
+  intensityValue.textContent = intensitySlider.value + '%';
+  chrome.storage.sync.set({ stutterIntensity: parseInt(intensitySlider.value) });
+});
+
+btnSpeak.addEventListener('click', () => {
+  const intensity = parseInt(intensitySlider.value);
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, { action: 'feature1' });
-    status.textContent = 'Feature 1 activated';
+    const tabId = tabs[0].id;
+    // Grab selection via scripting API (survives popup focus steal)
+    chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => window.getSelection().toString().trim()
+    }, (results) => {
+      const selectedText = results?.[0]?.result || '';
+      chrome.tabs.sendMessage(tabId, {
+        action: 'stutterSpeak',
+        stutterIntensity: intensity,
+        text: selectedText
+      }, (response) => {
+        if (response?.error) {
+          status.textContent = response.error;
+        } else {
+          status.textContent = 'Speaking...';
+          btnStop.disabled = false;
+        }
+      });
+    });
   });
+});
+
+btnStop.addEventListener('click', () => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.tabs.sendMessage(tabs[0].id, { action: 'stopSpeaking' });
+  });
+  status.textContent = 'Stopped';
+  btnStop.disabled = true;
 });
 
 document.getElementById('btn-feature-2').addEventListener('click', () => {

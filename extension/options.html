@@ -2,17 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Options – Hack de Pensionare</title>
+  <title>Options – The Anarchist</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; }
-    h1 { margin-bottom: 20px; }
+    body { font-family: system-ui, sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; background: #1a1a2e; color: #eee; }
+    h1 { margin-bottom: 20px; color: #e94560; }
+    h2 { margin: 24px 0 12px; font-size: 16px; color: #e94560; }
     label { display: block; margin-bottom: 12px; }
-    button { margin-top: 16px; padding: 8px 20px; cursor: pointer; }
-    .saved { color: green; margin-left: 10px; }
+    input[type="range"] { accent-color: #e94560; width: 200px; vertical-align: middle; }
+    select { padding: 4px 8px; }
+    button { margin-top: 16px; padding: 8px 20px; cursor: pointer; background: #e94560; color: #fff; border: none; border-radius: 6px; }
+    button:hover { background: #c0392b; }
+    .saved { color: #53d769; margin-left: 10px; }
   </style>
 </head>
 <body>
-  <h1>Hack de Pensionare – Options</h1>
+  <h1>The Anarchist – Options</h1>
 
   <label>
     <input type="checkbox" id="opt-notifications"> Enable notifications
@@ -20,6 +24,16 @@
 
   <label>
     <input type="checkbox" id="opt-context-menu"> Enable context menu
+  </label>
+
+  <h2>Stutter Speak</h2>
+
+  <label>
+    Stutter intensity: <input type="range" id="opt-stutter-intensity" min="0" max="100" value="50"> <span id="opt-intensity-val">50%</span>
+  </label>
+
+  <label>
+    Voice: <select id="opt-voice" style="padding:6px;border-radius:4px;background:#16213e;color:#eee;border:1px solid #555;"></select>
   </label>
 
   <button id="save">Save</button>

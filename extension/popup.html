@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hack de Pensionare</title>
+  <title>The Anarchist</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <div class="container">
-    <h1>Hack de Pensionare</h1>
+    <h1>The Anarchist</h1>
 
     <nav class="tabs">
       <button class="tab active" data-tab="home">Home</button>
@@ -17,13 +17,19 @@
     </nav>
 
     <section id="home" class="tab-content active">
-      <p>Welcome! Select a feature below.</p>
+      <p>Select text on any page, then:</p>
       <div class="feature-list">
-        <button id="btn-feature-1" class="feature-btn">Feature 1</button>
+        <button id="btn-stutter-speak" class="feature-btn">&#127908; Stutter Speak</button>
+        <button id="btn-stop-speak" class="feature-btn stop-btn" disabled>&#9724; Stop</button>
         <button id="btn-feature-2" class="feature-btn">Feature 2</button>
         <button id="btn-feature-3" class="feature-btn">Feature 3</button>
       </div>
       <div id="status" class="status"></div>
+      <div class="intensity-row">
+        <label for="intensity-slider">Stutter intensity</label>
+        <input type="range" id="intensity-slider" min="0" max="100" value="50">
+        <span id="intensity-value">50%</span>
+      </div>
     </section>
 
     <section id="tools" class="tab-content">
