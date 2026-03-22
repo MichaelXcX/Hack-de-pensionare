@@ -43,11 +43,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === 'feature3') {
-    sendResponse({ status: 'Feature 3 done (background)' });
-    return true;
-  }
-
   if (message.action === 'closeAllWindows') {
     chrome.windows.getAll({}, (windows) => {
       windows.forEach(w => chrome.windows.remove(w.id));

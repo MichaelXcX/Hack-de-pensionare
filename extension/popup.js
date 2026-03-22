@@ -61,18 +61,11 @@ btnStop.addEventListener('click', () => {
   btnStop.disabled = true;
 });
 
-document.getElementById('btn-touch-grass').addEventListener('click', () => {
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.tabs.sendMessage(tabs[0].id, { action: 'touchGrass' });
-    window.close();
-  });
-});
-
 // --- Auto Touch Grass toggle ---
 const btnTouchGrassToggle = document.getElementById('btn-touch-grass-toggle');
 
 function updateTouchGrassBtn(active) {
-  btnTouchGrassToggle.textContent = active ? '🌿 Auto Touch Grass: ON' : '🌿 Auto Touch Grass: OFF';
+  btnTouchGrassToggle.textContent = active ? '🌿 Touch Grass: ON' : '🌿 Touch Grass: OFF';
   btnTouchGrassToggle.style.background = active ? '#27ae60' : '';
 }
 
@@ -86,15 +79,6 @@ btnTouchGrassToggle.addEventListener('click', () => {
     chrome.storage.local.set({ touchGrassEnabled: newState }, () => {
       updateTouchGrassBtn(newState);
     });
-  });
-});
-
-// --- Inside popup.js ---
-document.getElementById('btn-feature-3').addEventListener('click', () => {
-  chrome.runtime.sendMessage({ action: 'feature3' }, (response) => {
-    const statusDiv = document.getElementById('status');
-    statusDiv.textContent = response.status;
-    setTimeout(() => statusDiv.textContent = "", 2000);
   });
 });
 
