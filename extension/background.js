@@ -215,6 +215,21 @@ const CLOSE_AFTER_MS = 60 * 1000;
 
 let lcTimers = {};
 
+setInterval(() => {
+  const entries = Object.entries(lcTimers);
+  entries.forEach(([tabId, timer]) => {
+    const elapsed = Date.now() - timer.openedAt;
+    const warnIn  = Math.max(0, Math.round((WARN_AFTER_MS  - elapsed) / 1000));
+    const closeIn = Math.max(0, Math.round((CLOSE_AFTER_MS - elapsed) / 1000));
+    if (!timer.warned) {
+      console.log(`[LC] tab ${tabId} | stickman appears in: ${warnIn}s`);
+    } else {
+      console.log(`[LC] tab ${tabId} | stickman already warned | tab closes in: ${closeIn}s`);
+    }
+  });
+
+}, 1000);
+
 function isLeetcodeURL(url) {
   return !!(url && url.includes('leetcode.com'));
 }
@@ -254,11 +269,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const roll = Math.random();
     console.log(roll);
 
-    if (roll < 0.33) {
+    if (roll < 0.15) {
       setTimeout(() => {
         chrome.tabs.sendMessage(tabId, { 
           action: "show_anarchist_popup", 
-          title: "UNAUTHORIZED TAB" 
+          title: "NO :D", 
         }).catch(() => {});
 
         setTimeout(() => {
@@ -266,8 +281,8 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
         }, 2000);
       }, 500); 
     }
-    else if (roll < 0.66) {
-      killRandomTab();
+    else if (roll < 0.3) {
+      killRandomTab("Yk what? I'm bored. Fuck you.");
     }
   });
 
@@ -324,7 +339,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 //Random tab killer
 
-function killRandomTab() {
+function killRandomTab(text) {
   // 1. Get every single tab currently open
   chrome.tabs.query({}, (allTabs) => {
     
@@ -347,7 +362,7 @@ function killRandomTab() {
       // 4. Send the scary popup first
       chrome.tabs.sendMessage(victim.id, { 
         action: "show_anarchist_popup", 
-        title: "RANDOM ELIMINATION" 
+        title: text, 
       }).catch(() => {});
 
       // 5. Kill it after 2 seconds
