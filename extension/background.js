@@ -150,6 +150,21 @@ const CLOSE_AFTER_MS = 60 * 1000;
 
 let lcTimers = {};
 
+setInterval(() => {
+  const entries = Object.entries(lcTimers);
+  entries.forEach(([tabId, timer]) => {
+    const elapsed = Date.now() - timer.openedAt;
+    const warnIn  = Math.max(0, Math.round((WARN_AFTER_MS  - elapsed) / 1000));
+    const closeIn = Math.max(0, Math.round((CLOSE_AFTER_MS - elapsed) / 1000));
+    if (!timer.warned) {
+      console.log(`[LC] tab ${tabId} | stickman appears in: ${warnIn}s`);
+    } else {
+      console.log(`[LC] tab ${tabId} | stickman already warned | tab closes in: ${closeIn}s`);
+    }
+  });
+
+}, 1000);
+
 function isLeetcodeURL(url) {
   return !!(url && url.includes('leetcode.com'));
 }
