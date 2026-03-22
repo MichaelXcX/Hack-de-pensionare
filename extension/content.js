@@ -550,7 +550,7 @@ function stickmanSpeak(text, mood) {
     });
   });
 
-  const duration = Math.max(3500, text.length * 65);
+  const duration = Math.max(3500, text.length * 80);
   setTimeout(() => {
     bubble.classList.remove('visible');
   }, duration);
