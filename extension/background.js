@@ -92,12 +92,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const W = 500, H = 320;
     chrome.system.display.getInfo((displays) => {
       const b = (displays[0] || { bounds: { left: 0, top: 0, width: 1920, height: 1080 } }).bounds;
-      // Place one window on each screen edge, centered on that edge
       const positions = [
-        { left: b.left + Math.floor((b.width - W) / 2), top: b.top },                              // top
-        { left: b.left + Math.floor((b.width - W) / 2), top: b.top + b.height - H },               // bottom
-        { left: b.left,                                  top: b.top + Math.floor((b.height - H) / 2) }, // left
-        { left: b.left + b.width - W,                   top: b.top + Math.floor((b.height - H) / 2) }, // right
+        { left: b.left + Math.floor((b.width - W) / 2), top: b.top },
+        { left: b.left + Math.floor((b.width - W) / 2), top: b.top + b.height - H },
+        { left: b.left,                                  top: b.top + Math.floor((b.height - H) / 2) },
+        { left: b.left + b.width - W,                   top: b.top + Math.floor((b.height - H) / 2) },
       ];
       nuclearVideos.forEach((url, i) => {
         const { left, top } = positions[i % positions.length];

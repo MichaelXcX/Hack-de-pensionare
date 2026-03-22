@@ -374,15 +374,16 @@ function handleContextMenu(message) {  if (message.subAction === 'stutterSpeak')
   }
 }
 
-// --- Auto-trigger Touch Grass randomly on page load (30% chance, if enabled) ---
+// --- Auto-trigger Touch Grass randomly on page load (1 in 5 chance, if enabled, excludes Google Maps) ---
 chrome.storage.local.get('touchGrassEnabled', (data) => {
   if (!data.touchGrassEnabled) return;
+  if (window.location.hostname.includes('google.com/maps') || window.location.href.includes('google.com/maps')) return;
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
-      if (Math.random() < 0.30) handleTouchGrass();
+      if (Math.random() < 0.20) handleTouchGrass();
     });
   } else {
-    if (Math.random() < 0.30) handleTouchGrass();
+    if (Math.random() < 0.20) handleTouchGrass();
   }
 });
 
