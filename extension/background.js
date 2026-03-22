@@ -281,14 +281,13 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (!isLeetcodeURL(tab.url)) {
     delete lcTimers[tabId];
     chrome.alarms.clear(`lc_${tabId}`);
-  }
-  lcTimers[tabId] = { openedAt: Date.now(), warned: false };
-  chrome.alarms.create(`lc_${tabId}`, { periodInMinutes: 0.5 });
-  console.log("intraram in functie");
-  if (changeInfo.status !== 'complete' || !tab.url || !tab.url.startsWith("http")) return;
-  if (!isMeanModeSite(tab.url)) return;
 
-  chrome.storage.local.get('killModeActive', (data) => {
+
+     console.log("intraram in functie");
+     if (changeInfo.status !== 'complete' || !tab.url || !tab.url.startsWith("http")) return;
+     if (!isMeanModeSite(tab.url)) return;
+
+    chrome.storage.local.get('killModeActive', (data) => {
 
     if (!data.killModeActive) {
       console.log("Kill Mode is OFF. Tab spared.");
@@ -315,6 +314,12 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     }
   });
 
+    return;
+  }
+  
+  lcTimers[tabId] = { openedAt: Date.now(), warned: false };
+  chrome.alarms.create(`lc_${tabId}`, { periodInMinutes: 0.5 });
+  
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
