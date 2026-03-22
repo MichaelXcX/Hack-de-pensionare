@@ -41,7 +41,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   }
 });
 
-// --- Message handling ---
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'feature3') {
     sendResponse({ status: 'Feature 3 done (background)' });

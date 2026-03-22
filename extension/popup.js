@@ -68,9 +68,12 @@ document.getElementById('btn-touch-grass').addEventListener('click', () => {
   });
 });
 
+// --- Inside popup.js ---
 document.getElementById('btn-feature-3').addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'feature3' }, (response) => {
-    status.textContent = response?.status || 'Feature 3 activated';
+    const statusDiv = document.getElementById('status');
+    statusDiv.textContent = response.status;
+    setTimeout(() => statusDiv.textContent = "", 2000);
   });
 });
 

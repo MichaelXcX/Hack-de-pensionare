@@ -238,3 +238,112 @@ function showToast(text) {
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
+
+const burns = {
+  ai: [
+    "Oh, asking the magic rock to think for you again?",
+    "Natural intelligence failed, so we're trying the artificial kind?",
+    "I'd explain why this is a bad prompt, but you'd just ask GPT to summarize it.",
+    "BEEP BOOP: 'I am a human who can't do my own homework.'"
+  ],
+  shopping: [
+    "Your bank account is screaming. Please stop.",
+    "Another purchase? That's bold for someone with your credit score.",
+    "Window shopping? Or just torture-testing your self-control?",
+    "That'll look great in the back of your closet for the next three years."
+  ],
+  social: [
+    "Scrolling again? Your dopamine receptors are literally fried.",
+    "Comparing your life to strangers? A classic Friday night move.",
+    "Refresh the page. Maybe someone liked your mediocre photo yet."
+  ],
+  generic: [
+    "I've seen faster typing from a pigeon.",
+    "Is this really the best use of your limited time on Earth?",
+    "Staring at the screen won't make you smarter, but keep trying."
+  ],
+  white_bg: [
+    "My eyes! Use dark mode, you caveman."
+  ],
+  nerd: [
+    "Esti urzica vere...",
+    "At this point just give up"
+  ]
+};
+
+// Helper to get a random insult from a category
+const getBurn = (category) => {
+  const list = burns[category] || burns.generic;
+  return list[Math.floor(Math.random() * list.length)];
+};
+
+
+let meanModeInterval = null;
+
+// Check if mode is already on when a new tab opens
+chrome.storage.local.get("meanModeActive", (data) => {
+  if (data.meanModeActive) startObserving();
+});
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message.action === 'toggleMeanMode') {
+    message.status ? startObserving() : stopObserving();
+  }
+});
+
+function startObserving() {
+  // 1. Detect Brightness (Mean Dark Mode check)
+  const bgColor = window.getComputedStyle(document.body).backgroundColor;
+  if (bgColor.includes("255, 255, 255")) {
+    showToast(getBurn('white_bg'));
+  }
+
+  // 2. Watch for "Stupid" interactions
+  document.addEventListener('click', (e) => {
+  // 1. Find the button or the closest thing to a button (handles <span> inside <button>)
+  const btn = e.target.closest('button') || e.target.closest('a');
+  
+  if (btn) {
+    const btnText = btn.innerText.toLowerCase().trim();
+    
+    // 2. Define your "Financial Regret" keywords
+    const buyKeywords = ['cart', 'buy', 'checkout', 'purchase', 'order', 'pay', 'cos', 'cumparaturi'];
+
+    // 3. Check if the button text contains any of those words
+    const isBuying = buyKeywords.some(keyword => btnText.includes(keyword));
+
+    if (isBuying) {
+      showToast(getBurn('shopping')); // Triggers your mean shopping burn
+    }
+  }
+});
+  
+  // 3. Mutation Observer to watch for AI/Search queries
+  const observer = new MutationObserver(() => {
+    const text = document.body.innerText.toLowerCase();
+    if (text.includes("moodle")) {
+      // Use a debounce or a flag so it doesn't spam toasts
+      if (!window.recentlyInsulted) {
+        showToast(getBurn('nerd'));
+        window.recentlyInsulted = true;
+        setTimeout(() => window.recentlyInsulted = false, 10000);
+      }
+    }
+    
+    if (text.includes("how do i") || text.includes("chatgpt") || text.includes("gemini") || text.includes("claude") || text.includes("how to")) {
+      // Use a debounce or a flag so it doesn't spam toasts
+      if (!window.recentlyInsulted) {
+        showToast(getBurn('ai'));
+        window.recentlyInsulted = true;
+        setTimeout(() => window.recentlyInsulted = false, 10000);
+      }
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+function stopObserving() {
+  document.removeEventListener('click', handleStupidClick);
+  location.reload(); // Simplest way to kill the MutationObserver
+}
