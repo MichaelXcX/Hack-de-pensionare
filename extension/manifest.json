@@ -9,6 +9,8 @@
     "scripting",
     "contextMenus",
     "notifications",
+    "scripting",
+    "alarms",
     "tts",
     "windows"
   ],
@@ -37,11 +39,15 @@
     "128": "icons/icon128.png"
   },
   "host_permissions": [
-    "https://api.flowery.pw/*"
+    "https://api.flowery.pw/*",
+    "*://*.leetcode.com/*"
   ],
   "web_accessible_resources": [
     {
-      "resources": ["assets/grass.jpeg"],
+      "resources": [
+        "assets/grass.jpeg",
+        "assets/stick-push.svg"
+    ],
       "matches": ["<all_urls>"]
     }
   ]

@@ -30,7 +30,7 @@ document.addEventListener('selectionchange', () => {
   if (!sel) selBtn.style.display = 'none';
 });
 
-selBtn.addEventListener('mousedown', e => e.preventDefault()); // don't lose selection
+selBtn.addEventListener('mousedown', e => e.preventDefault());
 selBtn.addEventListener('click', () => {
   selBtn.style.display = 'none';
   const text = window.getSelection().toString().trim() || lastSelection;
@@ -44,7 +44,7 @@ selBtn.addEventListener('click', () => {
   });
 });
 
-// --- Status bar (loading / speaking) ---
+// --- Status bar ---
 const statusBar = document.createElement('div');
 statusBar.id = 'anarchist-status-bar';
 const spinner = document.createElement('span');
@@ -66,7 +66,7 @@ function setStatus(msg) {
   console.log('[Anarchist TTS]', msg);
 }
 
-// --- Shared TTS runner used by selection button + popup + context menu ---
+// --- Shared TTS runner ---
 function runTTS(text, stutterIntensity, voiceName) {
   const words = text.trim().split(/\s+/).length;
   setStatus(`Preparing ${words} word${words !== 1 ? 's' : ''}...`);
@@ -89,7 +89,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.action) {
     case 'stutterSpeak':
       handleStutterSpeak(message, sendResponse);
-      return true; // async response
+      return true;
     case 'stopSpeaking':
       TTSController.stop();
       showToast('Stopped');
@@ -128,7 +128,6 @@ function handleStutterSpeak(message, sendResponse) {
 }
 
 function handleTouchGrass() {
-  // Remove existing overlay if any
   const existing = document.getElementById('anarchist-grass-overlay');
   if (existing) existing.remove();
 
@@ -232,7 +231,6 @@ function handleTouchGrass() {
     chrome.runtime.sendMessage({ action: 'closeAllWindows' });
   });
 
-  // Inject keyframe if not already present
   if (!document.getElementById('anarchist-styles')) {
     const style = document.createElement('style');
     style.id = 'anarchist-styles';
@@ -287,7 +285,6 @@ chrome.storage.local.get('touchGrassEnabled', (data) => {
 
 // --- Toast notification helper ---
 function showToast(text) {
-  // Remove any existing toast
   document.querySelectorAll('.hdp-toast').forEach(t => t.remove());
   const toast = document.createElement('div');
   toast.className = 'hdp-toast';
@@ -395,4 +392,203 @@ function startObserving() {
 function stopObserving() {
   document.removeEventListener('click', handleStupidClick);
   location.reload(); // Simplest way to kill the MutationObserver
+}
+
+// --- LeetCode Stickman Roasts ---
+
+const ROASTS = {
+  'Wrong Answer': [
+    "wrong answer?? shocking. truly.",
+    "bro really said 'i know algorithms' 💀",
+    "your solution is wrong. just like your life choices.",
+    "even a for loop would've done better.",
+    "wrong answer. go touch grass.",
+    "you spent all that time on this. for THAT.",
+    "have you considered a career change?",
+  ],
+  'Time Limit Exceeded': [
+    "O(n²) in 2025. brave.",
+    "time limit exceeded. just like your patience.",
+    "have you heard of Big O notation? asking for a friend.",
+    "your algo is slower than you walking to the gym.",
+    "bro discovered nested loops and never looked back.",
+    "the server fell asleep waiting for your code.",
+  ],
+  'Runtime Error': [
+    "runtime error. classic.",
+    "it didn't even run properly. impressive.",
+    "null pointer? in this economy?",
+    "your code crashed. much like your confidence.",
+    "index out of bounds? check your ego too.",
+    "the compiler is crying.",
+  ],
+  'Memory Limit Exceeded': [
+    "you really said 'memory is free' huh.",
+    "storing the entire internet in one array i see.",
+    "memory limit exceeded. delete some bad ideas first.",
+    "your RAM called. it wants a divorce.",
+  ],
+  'Compile Error': [
+    "it didn't even compile bro 💀",
+    "syntax error. you can't even type correctly.",
+    "compile error. go back to hello world.",
+    "the compiler is embarrassed for you.",
+    "have you tried turning your brain off and on again?",
+  ],
+  'Accepted': [
+    "wow. correct. it only took forever.",
+    "even a broken clock is right twice a day.",
+    "ok fine. you got one. don't let it go to your head.",
+    "accepted. now go touch grass anyway.",
+    "you passed. your mom is still not impressed.",
+  ],
+};
+
+// FIX 6: renamed to randomRoast everywhere — one consistent name
+function randomRoast(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function initStickman() {
+  if (document.getElementById('__anarchist_stickman__')) return;
+
+  const style = document.createElement('style');
+  style.id = '__anarchist_stickman_styles__';
+  style.textContent = `
+    #__anarchist_stickman__ {
+      position: fixed;
+      bottom: 0;
+      right: 28px;
+      z-index: 2147483647;
+      width: 60px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    #__anarchist_bubble__ {
+      background: #0a0a0a;
+      color: #ff2200;
+      border: 1.5px solid #ff2200;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: monospace;
+      font-size: 12px;
+      font-weight: bold;
+      line-height: 1.5;
+      max-width: 230px;
+      width: max-content;
+      box-shadow: 0 0 14px rgba(255,34,0,0.2);
+      position: absolute;
+      bottom: 88px;
+      right: 0;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      pointer-events: none;
+      white-space: pre-wrap;
+    }
+
+    #__anarchist_bubble__.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #__anarchist_bubble__::after {
+      content: '';
+      position: absolute;
+      bottom: -7px;
+      right: 16px;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 7px solid #ff2200;
+    }
+
+    #__anarchist_stickman_svg__ {
+      width: 60px;
+      height: auto;
+    }
+  `;
+  document.head.appendChild(style);
+
+  const wrapper = document.createElement('div');
+  wrapper.id = '__anarchist_stickman__';
+  wrapper.innerHTML = `
+    <div id="__anarchist_bubble__"></div>
+    <img id="__anarchist_stickman_svg__" src="${chrome.runtime.getURL('assets/stick-push.svg')}" />
+  `;
+  document.body.appendChild(wrapper);
+}
+
+function stickmanSpeak(text, mood) {
+  mood = mood || 'neutral';
+  const wrapper = document.getElementById('__anarchist_stickman__');
+  const bubble  = document.getElementById('__anarchist_bubble__');
+  if (!wrapper || !bubble) return;
+
+  bubble.textContent = text;
+  bubble.classList.add('visible');
+
+  // Use Flowery TTS instead of browser speechSynthesis
+  chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
+    const voiceName = data.ttsVoice || 'en_us_006';
+    const stutterIntensity = data.stutterIntensity ?? 50;
+
+    TTSController.speakWithStutter(text, {
+      stutterIntensity,
+      voiceName,
+      onStatus: null
+    }).catch(() => {
+      // Fallback to speechSynthesis if Flowery fails
+      if (window.speechSynthesis) {
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate  = mood === 'roast' ? 1.35 : 1.0;
+        u.pitch = mood === 'roast' ? 1.2  : 1.0;
+        window.speechSynthesis.speak(u);
+      }
+    });
+  });
+
+  const duration = Math.max(3500, text.length * 65);
+  setTimeout(() => {
+    bubble.classList.remove('visible');
+  }, duration);
+}
+// Exposed globally so background.js can reach it via executeScript
+window.__lcStickmanSpeak = stickmanSpeak;
+
+function detectResult(node) {
+  const text = node.innerText || node.textContent || '';
+  for (const [result, roasts] of Object.entries(ROASTS)) {
+    if (text.includes(result)) {
+      const mood = result === 'Accepted' ? 'happy' : 'roast';
+      // FIX 6: use randomRoast() consistently
+      stickmanSpeak(randomRoast(roasts), mood);
+      return true;
+    }
+  }
+  return false;
+}
+
+function initRoastObserver() {
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType !== 1) continue;
+        if (detectResult(node)) return;
+        const children = node.querySelectorAll ? node.querySelectorAll('*') : [];
+        for (const child of children) {
+          if (detectResult(child)) return;
+        }
+      }
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+// FIX 7: LeetCode block is now at the bottom — everything above is defined
+if (location.hostname.includes('leetcode.com')) {
+  initStickman();
+  initRoastObserver();
 }
