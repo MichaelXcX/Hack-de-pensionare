@@ -20,7 +20,7 @@ chrome.runtime.onInstalled.addListener(() => {
     title: 'Touch Grass',
     contexts: ['page', 'selection']
   });
-  
+
   chrome.storage.sync.set({
     notifications: true,
     stutterIntensity: 50,

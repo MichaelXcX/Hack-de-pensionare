@@ -15,6 +15,7 @@ const btnStop = document.getElementById('btn-stop-speak');
 const intensitySlider = document.getElementById('intensity-slider');
 const intensityValue = document.getElementById('intensity-value');
 
+
 // Load saved intensity
 chrome.storage.sync.get('stutterIntensity', (data) => {
   const val = data.stutterIntensity ?? 50;
@@ -130,6 +131,26 @@ btnKillMode.addEventListener('click', () => {
     const newState = !data.killModeActive;
     chrome.storage.local.set({ killModeActive: newState }, () => {
       updateKillBtn(newState);
+       });
+  });    
+}); 
+
+// --- LeetCode Roast ---
+const btnLeetCodeRoast = document.getElementById('btn-leetcode-roast');
+function updateLcRoastBtn(active) {
+  btnLeetCodeRoast.textContent = active ? '🔥 LeetCode Roast: ON' : '🔥 LeetCode Roast: OFF';
+  btnLeetCodeRoast.style.background = active ? '#e94560' : '';
+}
+
+chrome.storage.local.get('lcRoastEnabled', (data) => {
+  updateLcRoastBtn(!!data.lcRoastEnabled);
+});
+
+btnLeetCodeRoast.addEventListener('click', () => {
+  chrome.storage.local.get('lcRoastEnabled', (data) => {
+    const newState = !data.lcRoastEnabled;
+    chrome.storage.local.set({ lcRoastEnabled: newState }, () => {
+      updateLcRoastBtn(newState);
     });
   });
 });
