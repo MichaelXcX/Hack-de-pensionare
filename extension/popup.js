@@ -109,6 +109,31 @@ btnMeanMode.addEventListener('click', () => {
   });
 });
 
+
+// --- Kill Mode toggle ---
+// --- Kill Mode toggle ---
+const btnKillMode = document.getElementById('btn-kill-mode');
+
+function updateKillBtn(active) {
+  btnKillMode.textContent = active ? '💀 Kill Mode: ON' : '💀 Kill Mode: OFF';
+  btnKillMode.style.background = active ? '#520000' : ''; // Dark red when active
+  btnKillMode.style.color = active ? '#ff0000' : '';
+}
+
+// Initialize button state on popup load
+chrome.storage.local.get('killModeActive', (data) => {
+  updateKillBtn(!!data.killModeActive);
+});
+
+btnKillMode.addEventListener('click', () => {
+  chrome.storage.local.get('killModeActive', (data) => {
+    const newState = !data.killModeActive;
+    chrome.storage.local.set({ killModeActive: newState }, () => {
+      updateKillBtn(newState);
+    });
+  });
+});
+
 // --- Settings ---
 const notifToggle = document.getElementById('toggle-notifications');
 
