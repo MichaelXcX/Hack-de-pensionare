@@ -35,6 +35,10 @@ selBtn.addEventListener('click', () => {
   selBtn.style.display = 'none';
   const text = window.getSelection().toString().trim() || lastSelection;
   if (!text) return;
+  if (!chrome?.storage?.sync) {
+    showToast('Extension reloaded — please refresh the page.');
+    return;
+  }
   chrome.storage.sync.get(['ttsVoice', 'stutterIntensity'], (data) => {
     runTTS(text, data.stutterIntensity ?? 50, data.ttsVoice || 'en_us_006');
   });
